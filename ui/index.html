@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Constellation</title>
+<script src="/vendor/marked.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js'"></script>
+<script type="module" src="/vendor/model-viewer.min.js"></script>
+<style>
+:root{--bg:#0f1115;--panel:#161920;--panel2:#1d212a;--line:#2a2f3a;--text:#e6e8ec;--dim:#8b93a3;
+--accent:#7c9cff;--dec:#ff8fb1;--ok:#3ecf8e;--bad:#ff6b6b;--warn:#f5b04c;--in:#3aa7a0;--tool:#7c9cff;--out:#c48cff;--ai:#f5b04c}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+font:13px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+.app{display:grid;grid-template-columns:290px 1fr 360px;height:100vh}
+aside{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:14px}
+aside.right{border-right:0;border-left:1px solid var(--line)}
+h1{font-size:15px;margin:0 0 2px;letter-spacing:.3px}h2{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);margin:18px 0 8px}
+.sub{color:var(--dim);font-size:12px}
+textarea,input[type=text],select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:8px}
+textarea{resize:vertical;min-height:62px}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:7px 11px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}.btn.primary{background:var(--accent);border-color:var(--accent);color:#0b0e14;font-weight:600}
+.row{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.lib{display:flex;flex-direction:column;gap:6px}
+.libitem{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer}
+.libitem:hover{border-color:var(--accent)}.libitem b{font-size:12.5px}
+.libitem .types{color:var(--dim);font-size:11px;margin-top:3px;word-break:break-word}
+.pill{display:inline-block;font-size:10px;padding:1px 6px;border-radius:9px;margin-left:5px;vertical-align:1px}
+.pill.verified{background:#1e3b2e;color:var(--ok)}.pill.failed,.pill.unverified{background:#3b1e22;color:var(--bad)}
+main{position:relative;overflow:hidden;background-color:var(--bg);
+background-image:radial-gradient(#252a35 1px,transparent 1px);background-size:22px 22px}
+.toolbar{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:6px;z-index:5;align-items:center}
+.toolbar .status{margin-left:auto;color:var(--dim);font-size:12px}
+#world{position:absolute;left:0;top:0;width:4000px;height:3000px;transform-origin:0 0}
+main.panning{cursor:grabbing}
+svg#edges{position:absolute;left:0;top:0;width:4000px;height:3000px;pointer-events:none;overflow:visible}
+svg#edges path{stroke:#4d566a;stroke-width:2;fill:none;pointer-events:stroke;cursor:pointer}
+svg#edges path:hover{stroke:var(--bad)}svg#edges path.live{stroke:var(--ok)}
+.node{position:absolute;width:230px;background:var(--panel);border:1px solid var(--line);border-radius:10px;
+box-shadow:0 6px 20px rgba(0,0,0,.35);user-select:none}
+.node.sel{border-color:var(--accent)}.node.done{box-shadow:0 0 0 1px var(--ok),0 6px 20px rgba(0,0,0,.35)}
+.node.failed{box-shadow:0 0 0 1px var(--bad),0 6px 20px rgba(0,0,0,.35)}.node.skipped{opacity:.45}
+details.set{margin-top:18px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--panel2)}
+details.set summary{cursor:pointer;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--dim)}
+.ok{color:var(--ok)}.dec{font-size:11.5px;color:var(--dim);margin-top:4px}.node.running{box-shadow:0 0 0 1px var(--warn)}
+.nh{padding:8px 10px;border-bottom:1px solid var(--line);cursor:grab;display:flex;gap:7px;align-items:center;border-radius:10px 10px 0 0}
+.nh .dot{width:8px;height:8px;border-radius:50%}
+.nh .t{font-weight:600;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nh .k{margin-left:auto;font-size:10px;color:var(--dim);text-transform:uppercase}
+.nb{padding:6px 0}
+.port{display:flex;align-items:center;gap:6px;padding:3px 10px;font-size:11.5px;position:relative}
+.port.out{justify-content:flex-end}
+.port .c{width:11px;height:11px;border-radius:50%;border:2px solid #5a6478;background:var(--panel);cursor:crosshair;flex:none}
+.port.in .c{margin-left:-16px}.port.out .c{margin-right:-16px}
+.port .c:hover,.port .c.pending{border-color:var(--accent);background:var(--accent)}
+.port .m{color:var(--dim);font-size:10px}
+.nf{padding:6px 10px 9px;border-top:1px solid var(--line)}
+.nf input[type=file]{width:100%;font-size:11px}
+.nf .fname{font-size:11px;color:var(--ok);word-break:break-all}
+.outlink{color:var(--accent);font-size:11.5px;word-break:break-all}
+.insp{font-size:12.5px}.insp .md table{border-collapse:collapse;width:100%;font-size:11.5px}
+.insp .md td,.insp .md th{border:1px solid var(--line);padding:3px 5px;text-align:left}
+.insp .md pre,.log{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:8px;overflow:auto;
+white-space:pre-wrap;font:11.5px/1.4 ui-monospace,Menlo,Consolas,monospace;max-height:320px}
+.insp .md h1{font-size:15px}.insp .md h2{font-size:11px}
+.errs{color:var(--bad);font-size:12px;margin-top:8px;white-space:pre-wrap}
+.preview{width:100%;height:280px;border:1px solid var(--line);border-radius:8px;background:#fff}
+model-viewer{width:100%;height:280px;background:var(--panel2);border-radius:8px}
+label.f{display:block;color:var(--dim);font-size:11px;margin:8px 0 3px}
+.hint{color:var(--dim);font-size:11.5px;margin-top:6px}
+
+/* ---- refinements (v2) */
+:root{--r:10px;--shadow:0 10px 30px rgba(0,0,0,.35)}
+::selection{background:#7c9cff55}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#2a2f3a;border-radius:9px;border:2px solid var(--panel)}
+.app{grid-template-columns:316px 1fr 380px}
+aside{padding:0;display:flex;flex-direction:column}
+.brand{display:flex;gap:11px;align-items:center;padding:16px 16px 12px}
+.logo{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:17px;color:#0b0e14;
+  background:linear-gradient(135deg,#9db4ff,#7c9cff 55%,#c48cff)}
+.brand h1{margin:0;font-size:15px;letter-spacing:.2px}.brand .sub{font-size:11.5px}
+.icon{margin-left:auto;background:none;border:1px solid var(--line);border-radius:8px;width:30px;height:30px;cursor:pointer;color:var(--dim)}
+.icon:hover{color:var(--text);border-color:var(--accent)}
+.tabs{display:flex;gap:2px;margin:0 14px;padding:3px;background:var(--bg);border:1px solid var(--line);border-radius:9px}
+.tabs button{flex:1;background:none;border:0;border-radius:7px;padding:6px 4px;cursor:pointer;color:var(--dim);font-size:12px}
+.tabs button.on{background:var(--panel2);color:var(--text);box-shadow:0 1px 0 #ffffff0d inset}
+.tabs i{font-style:normal;font-size:10px;background:#ffffff12;border-radius:8px;padding:0 6px;margin-left:3px}
+.pane{display:none;padding:4px 14px 18px;overflow:auto;flex:1}.pane.on{display:block}
+h2{margin:18px 0 8px}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-top:10px}
+.card h3{margin:0 0 2px;font-size:12.5px}.card .hint{margin:0 0 8px}
+.card .row{margin-top:8px}
+.btn{border-radius:8px;transition:border-color .15s,background .15s,transform .05s}.btn:active{transform:translateY(1px)}
+a.btn{color:var(--text);display:inline-block}.btn.ghost{background:none}.btn.sm{padding:4px 9px;font-size:11.5px}.btn[disabled]{opacity:.5;cursor:wait}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.chip{border:1px solid var(--line);background:none;border-radius:20px;padding:3px 10px;font-size:11.5px;color:var(--dim);cursor:pointer}
+.chip.on{background:#7c9cff22;border-color:var(--accent);color:var(--text)}
+.libitem{display:grid;grid-template-columns:8px 1fr auto;gap:2px 10px;align-items:center;padding:9px 11px}
+.sdot{width:8px;height:8px;border-radius:50%;background:var(--ok);grid-row:1/3}.sdot.failed,.sdot.unverified{background:var(--bad)}
+.libitem .nm{font-weight:600;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.libitem .types{grid-column:2/4;margin:0}
+.tag{font-size:10px;border:1px solid var(--line);border-radius:6px;padding:0 5px;color:var(--dim);margin-left:6px;font-weight:400}
+.tag.wrap{color:#c48cff;border-color:#c48cff55}
+.empty{border:1px dashed var(--line);border-radius:var(--r);padding:18px;text-align:center;color:var(--dim)}
+.palette{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.palette .btn{text-align:left;display:flex;gap:7px;align-items:center}
+.palette .dot{width:8px;height:8px;border-radius:50%}
+.toolbar{padding:6px;background:#161920cc;backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.toolbar .status{padding-right:6px}
+.seg{display:flex;gap:6px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:12px}.kv span:nth-child(odd){color:var(--dim)}
+.res{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:8px}
+.res td,.res th{border-bottom:1px solid var(--line);padding:5px 4px;text-align:left;vertical-align:top}
+.badge{font-size:10px;border-radius:6px;padding:1px 6px;font-weight:600}
+.badge.onboard,.badge.wrap{background:#1e3b2e;color:var(--ok)}.badge.skip{background:#3b2f1e;color:var(--warn)}
+.fnrow{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.fnrow:last-child{border:0}.fnrow b{font-size:12px}.fnrow .m{color:var(--dim);font-size:11px}
+.fnrow .go{margin-left:auto}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:18px;width:min(460px,92vw);box-shadow:var(--shadow)}
+dialog::backdrop{background:#000a;backdrop-filter:blur(2px)}
+dialog h3{margin:0 0 4px}
+.itabs{display:flex;gap:2px;margin:10px 0;border-bottom:1px solid var(--line)}
+.itabs button{background:none;border:0;border-bottom:2px solid transparent;padding:6px 10px;cursor:pointer;color:var(--dim);font-size:12px}
+.itabs button.on{color:var(--text);border-color:var(--accent)}
+.log.tall{max-height:420px}
+aside.right{padding:14px}
+@media (max-width:900px){.app{grid-template-columns:1fr;grid-template-rows:auto 70vh auto}aside{border:0}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside>
+  <div class="brand"><div class="logo">✦</div><div><h1>Constellation</h1><div class="sub">Tools → verified nodes → pipelines</div></div>
+    <button class="icon" id="gear" title="AI settings">⚙</button></div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="build" class="on">Build</button><button data-tab="lib">Library<i id="libCount">0</i></button><button data-tab="add">Add tools</button>
+  </nav>
+
+  <section class="pane on" data-pane="build">
+    <h2>Describe what you need</h2>
+    <textarea id="ask" placeholder="e.g. 3d bom affiliate listing">3d bom affiliate listing</textarea>
+    <div class="row"><button class="btn primary" id="planBtn">Build pipeline</button></div>
+    <div id="planNote" class="hint"></div>
+    <h2>Add to canvas</h2>
+    <div class="palette">
+      <button class="btn" data-add="input"><span class="dot" style="background:var(--in)"></span>Upload</button>
+      <button class="btn" data-add="output"><span class="dot" style="background:var(--out)"></span>Output</button>
+      <button class="btn" data-add="ai"><span class="dot" style="background:var(--ai)"></span>AI step</button>
+      <button class="btn" data-add="decide"><span class="dot" style="background:var(--dec)"></span>Decision</button>
+    </div>
+    <div class="hint">Tools come from the Library tab. Click a card to place it.</div>
+  </section>
+
+  <section class="pane" data-pane="lib">
+    <input type="text" id="libQ" placeholder="Search nodes, types, tags…" style="margin-top:6px">
+    <div class="chips" id="libF">
+      <button class="chip on" data-f="all">All</button><button class="chip" data-f="verified">Verified</button>
+      <button class="chip" data-f="attention">Needs attention</button><button class="chip" data-f="wrapper">Wrappers</button>
+    </div>
+    <div class="lib" id="lib"></div>
+    <h2>Skills for LLMs</h2>
+    <div class="hint" style="margin-top:0">One SKILL.md per verified node plus a playbook, so an agent knows when and how to use each tool.</div>
+    <div class="row">
+      <button class="btn sm" id="skGen">Generate</button>
+      <button class="btn sm" id="skCheck">Check activation</button>
+      <a class="btn sm" id="skZip" href="/api/skills.zip" style="text-decoration:none">Download bundle</a>
+    </div>
+    <div id="skOut" class="hint"></div>
+  </section>
+
+  <section class="pane" data-pane="add">
+    <div class="card"><h3>Scan a folder or git repo</h3>
+      <div class="hint">Reads the code without running it, then lists the tools, services and functions it found.</div>
+      <input type="text" id="crPath" placeholder="folder path or https://… git URL">
+      <div class="row"><button class="btn" id="crScan">Scan</button><button class="btn primary" id="crRun">Scan &amp; onboard all</button></div>
+    </div>
+    <div class="card"><h3>Wrap a library function</h3>
+      <div class="hint">For code with no command line: a function that just converts one thing into another.</div>
+      <input type="text" id="wrPath" placeholder="path/to/module.py">
+      <div class="row"><button class="btn" id="wrFind">Find functions</button></div>
+      <div id="wrList"></div>
+    </div>
+    <div class="card"><h3>Onboard one tool</h3>
+      <div class="hint">Probes entry points, runs it on shipped samples, keeps it only if outputs really appear.</div>
+      <input type="text" id="obPath" placeholder="folder path, e.g. sample_tools/step2glb">
+      <div class="row"><input type="file" id="obZip" accept=".zip,.py,.sh,.js,.exe,*"></div>
+      <div class="row"><button class="btn" id="obBtn">Analyze &amp; verify</button></div>
+    </div>
+  </section>
+</aside>
+
+<dialog id="setDlg">
+  <h3>AI settings</h3>
+  <div class="hint" style="margin-top:0">The model is optional. Without one, heuristics plan and decide.</div>
+  <label class="f">LLM provider</label>
+  <select id="sProv"><option value="none">none (heuristics only)</option><option value="anthropic">Anthropic (Claude)</option>
+    <option value="openai">OpenAI-compatible (OpenAI, OpenRouter, Ollama, vLLM, LM Studio)</option></select>
+  <div class="row"><button class="btn sm" id="sOllama">Use local Ollama</button><span class="hint" style="margin:6px 0 0">fills in http://localhost:11434 and lists your installed models</span></div>
+  <label class="f">Model</label><div class="row" style="margin-top:0"><input type="text" id="sModel" list="modelList" placeholder="claude-sonnet-5-5 · or pick from your server" style="flex:1"><button class="btn sm" id="sFetch" title="Ask the server which models it has">Fetch models</button></div><datalist id="modelList"></datalist><div id="sModels" class="chips"></div>
+  <label class="f">Base URL (OpenAI-compatible / proxy only)</label><input type="text" id="sBase" placeholder="http://localhost:11434/v1">
+  <label class="f">API key (stored only on this machine)</label><input type="text" id="sKey" placeholder="sk-ant-… / sk-… / leave empty for Ollama" autocomplete="off">
+  <label class="f">Decision engine</label>
+  <select id="sDec"><option value="auto">auto (Laya if installed → LLM → heuristic)</option><option value="laya">Laya</option>
+    <option value="llm">LLM</option><option value="heuristic">heuristic only</option></select>
+  <label class="f">Laya checkpoint (optional)</label><input type="text" id="sLaya" placeholder="english · multilingual · typed-decisions">
+  <label class="f">Minimum confidence to trust a decision</label><input type="text" id="sConf" placeholder="0.5">
+  <div class="row" style="margin-top:14px"><button class="btn primary" id="sSave">Save &amp; test</button><button class="btn ghost" id="sClose">Close</button></div>
+  <div id="sOut" class="hint"></div>
+</dialog>
+
+<main>
+  <div class="toolbar">
+    <button class="btn primary" id="runBtn">▶ Run</button>
+    <button class="btn" id="valBtn">Validate</button>
+    <span class="seg"><button class="btn ghost" id="layoutBtn">Auto-layout</button><button class="btn ghost" id="fitBtn">Fit</button><button class="btn ghost" id="clearBtn">Clear</button></span>
+    <span class="status" id="status"></span>
+  </div>
+  <div id="world"><svg id="edges"></svg></div>
+</main>
+
+<aside class="right insp" id="insp">
+  <h2 style="margin-top:0">Inspector</h2>
+  <div class="hint">Click a node. Connect by clicking an output port, then an input port. Click an edge to delete it.</div>
+</aside>
+</div>
+
+<script>
+const S = {nodes: [], edges: [], reg: {}, files: {}, results: {}, sel: null, pending: null, seq: 1, view: {x: 0, y: 0, z: 1}};
+const $ = s => document.querySelector(s);
+const world = $("#world"), svg = $("#edges");
+const KC = {input: "var(--in)", tool: "var(--tool)", output: "var(--out)", ai: "var(--ai)", decide: "var(--dec)"};
+function decideOptions(n) {
+  const o = n.options || "yes: \nno: ";
+  if (typeof o !== "string") return Object.keys(o);
+  const names = o.split("\n").map(l => l.split(":")[0].trim().replace(/[^a-zA-Z0-9_]+/g, "_").replace(/^_+|_+$/g, "")).filter(Boolean);
+  return names.length ? names : ["yes", "no"];
+}
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+async function api(path, opt) { const r = await fetch(path, opt); if (!r.ok) throw new Error(await r.text()); return r.json(); }
+
+const Q = {q: "", f: "all", tab: "build"};
+function libMatches(m) {
+  const t = (m.id + " " + (m.description || "") + " " + (m.tags || []).join(" ") + " " + m.inputs.map(p => p.mime).join(" ") + " " + m.outputs.map(p => p.mime).join(" ")).toLowerCase();
+  if (Q.q && !Q.q.toLowerCase().split(/\s+/).every(w => t.includes(w))) return false;
+  if (Q.f === "verified") return m.verification.status === "verified";
+  if (Q.f === "attention") return m.verification.status !== "verified" || !m.human_approved;
+  if (Q.f === "wrapper") return m.origin === "wrapper";
+  return true;
+}
+const short = mime => ({"text/csv": "csv", "application/json": "json", "text/html": "html", "text/plain": "text", "text/markdown": "md", "model/step": "step",
+  "model/gltf-binary": "glb", "application/pdf": "pdf", "image/png": "png", "*/*": "any"})[mime] || mime.split("/").pop();
+function renderLib() {
+  const all = Object.values(S.reg), list = all.filter(libMatches);
+  $("#libCount").textContent = all.length;
+  $("#lib").innerHTML = list.map(m => `<div class="libitem" data-tool="${esc(m.id)}" title="${esc(m.description || "")}">
+    <span class="sdot ${m.verification.status}"></span>
+    <span class="nm">${esc(m.id)}</span>
+    <span class="pill ${m.verification.status}" style="margin:0">${m.verification.status}</span>
+    <div class="types">${m.inputs.filter(p => p.kind !== "param").map(p => esc(short(p.mime))).join(" + ") || "—"} → ${m.outputs.map(p => esc(short(p.mime))).join(", ")}${m.origin === "wrapper" ? `<span class="tag wrap">wrapper</span>` : ""}</div></div>`).join("")
+    || `<div class="empty">${all.length ? "Nothing matches." : "No nodes yet. Open <b>Add tools</b> to scan a repo, wrap a function or onboard a tool."}</div>`;
+}
+async function loadReg() {
+  let list;
+  try { list = await api("/api/nodes"); }
+  catch (e) {
+    $("#lib").innerHTML = `<div class="errs">Could not load the node list: ${esc(e.message)}</div><div class="row"><button class="btn sm" id="retryReg">Retry</button></div>`;
+    $("#retryReg").onclick = () => loadReg().then(render);
+    throw e;
+  }
+  S.reg = Object.fromEntries(list.map(m => [m.id, m]));
+  try { renderLib(); } catch (e) { $("#lib").innerHTML = `<div class="errs">Library display error: ${esc(e.message)}</div>`; }
+  render(); inspect();
+  let st;
+  try { st = await api("/api/status"); } catch (e) { $("#status").textContent = "status unavailable: " + e.message; return; }
+  const missing = Object.entries(st.runtimes || {}).filter(([k, v]) => v === "MISSING" && ["node", "bash", "cc"].includes(k)).map(([k]) => k);
+  $("#status").textContent = `LLM: ${st.llm === "none" ? "off (heuristics only)" : st.llm + " · " + st.model}` +
+    (missing.length ? ` · missing runtimes: ${missing.join(", ")}` : "");
+}
+function setTab(t) {
+  Q.tab = t;
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
+  document.querySelectorAll(".pane").forEach(p => p.classList.toggle("on", p.dataset.pane === t));
+}
+$("#tabs").onclick = ev => { const b = ev.target.closest("button"); if (b) setTab(b.dataset.tab); };
+$("#libQ").oninput = ev => { Q.q = ev.target.value; renderLib(); };
+$("#libF").onclick = ev => { const c = ev.target.closest(".chip"); if (!c) return; Q.f = c.dataset.f;
+  document.querySelectorAll("#libF .chip").forEach(x => x.classList.toggle("on", x === c)); renderLib(); };
+$("#gear").onclick = () => $("#setDlg").showModal();
+async function fetchModels() {
+  const q = new URLSearchParams({base_url: $("#sBase").value.trim(), api_key: $("#sKey").value.trim()});
+  $("#sModels").innerHTML = `<span class="hint">asking the server…</span>`;
+  try {
+    const r = await api("/api/models?" + q);
+    if (!$("#sBase").value.trim() || r.server === "ollama") $("#sBase").value = r.base_url;
+    if (r.server === "ollama" || $("#sProv").value === "none") $("#sProv").value = "openai";
+    $("#modelList").innerHTML = r.models.map(m => `<option value="${esc(m.name)}">`).join("");
+    $("#sModels").innerHTML = r.models.length ? r.models.map(m => `<button class="chip ${m.name === $("#sModel").value ? "on" : ""}" data-m="${esc(m.name)}">${esc(m.name)}${m.size ? " · " + (m.size / 1e9).toFixed(1) + " GB" : ""}</button>`).join("")
+      : `<span class="hint">${esc(r.server)} is running but has no models. For Ollama: <code>ollama pull llama3.1</code></span>`;
+  } catch (e) { $("#sModels").innerHTML = `<div class="errs">${esc(e.message)}</div>`; }
+}
+$("#sFetch").onclick = fetchModels;
+$("#sOllama").onclick = () => { $("#sProv").value = "openai"; $("#sBase").value = "http://localhost:11434/v1"; $("#sKey").value = ""; fetchModels(); };
+$("#sModels").onclick = ev => { const c = ev.target.closest("[data-m]"); if (!c) return; $("#sModel").value = c.dataset.m;
+  document.querySelectorAll("#sModels .chip").forEach(x => x.classList.toggle("on", x === c)); };
+$("#sClose").onclick = () => $("#setDlg").close();
+
+function ports(n) {
+  if (n.kind === "decide") return {ins: [{name: "in", mime: "text/plain"}], outs: decideOptions(n).map(o => ({name: o, mime: "branch"}))};
+  if (n.kind === "input") return {ins: [], outs: [{name: "file", mime: n.mime || "*/*"}]};
+  if (n.kind === "output") return {ins: [{name: "file", mime: "*/*"}], outs: []};
+  if (n.kind === "ai") return {ins: [{name: "in", mime: "text/plain"}], outs: [{name: "out", mime: n.mime || "text/markdown"}]};
+  const m = S.reg[n.tool]; if (!m) return {ins: [{name: "(node '" + n.tool + "' not in library)", mime: "reload"}], outs: []};
+  return {ins: m.inputs.filter(p => p.kind !== "param").map(p => ({name: p.name, mime: p.mime, req: p.required})),
+          outs: m.outputs.map(p => ({name: p.name, mime: p.mime}))};
+}
+
+function title(n) {
+  if (n.kind === "decide") return n.question ? n.question.slice(0, 40) : "Decision";
+  return n.kind === "tool" ? n.tool : n.kind === "input" ? (n.label || "Upload") : n.kind === "output" ? (n.label || "Output") : "AI step";
+}
+
+function render() {
+  world.querySelectorAll(".node").forEach(e => e.remove());
+  for (const n of S.nodes) {
+    const {ins, outs} = ports(n), res = S.results[n.id];
+    const el = document.createElement("div");
+    el.className = `node ${S.sel === n.id ? "sel" : ""} ${res ? res.status : ""}`;
+    el.style.left = n.x + "px"; el.style.top = n.y + "px"; el.dataset.id = n.id;
+    let foot = "";
+    if (n.kind === "input") foot = `<div class="nf"><input type="file" data-file="${n.id}">${S.files[n.id] ? `<div class="fname">${esc(S.files[n.id].name)}</div>` : ""}</div>`;
+    if (n.kind === "output" && res && res.urls && res.urls.file) foot = `<div class="nf"><a class="outlink" target="_blank" href="${res.urls.file}">${esc(res.urls.file.split("/").pop())}</a></div>`;
+    if (n.kind === "decide" && res && res.decision) foot = `<div class="nf sub">→ <b>${esc(res.decision.choice)}</b> · ${esc(res.decision.backend)} · ${(+res.decision.confidence).toFixed(2)}</div>`;
+    if (res && res.status === "skipped") foot += `<div class="nf sub">skipped (branch not taken)</div>`;
+    if (n.kind === "tool") foot = `<div class="nf sub">backend: ${esc(n.backend || "local")}${res ? ` · ${res.seconds}s` : ""}</div>`;
+    if (res && res.status === "failed") foot += `<div class="nf errs">${esc((res.errors || []).join("\n"))}</div>`;
+    el.innerHTML = `<div class="nh"><span class="dot" style="background:${KC[n.kind]}"></span><span class="t">${esc(title(n))}</span><span class="k">${n.kind}</span></div>
+      <div class="nb">${ins.map(p => `<div class="port in"><span class="c" data-port="in" data-node="${n.id}" data-name="${esc(p.name)}"></span>${esc(p.name)}${p.req === false ? "?" : ""} <span class="m">${esc(p.mime)}</span></div>`).join("")}
+      ${outs.map(p => `<div class="port out"><span class="m">${esc(p.mime)}</span> ${esc(p.name)}<span class="c" data-port="out" data-node="${n.id}" data-name="${esc(p.name)}"></span></div>`).join("")}</div>${foot}`;
+    world.appendChild(el);
+  }
+  drawEdges();
+}
+
+function portXY(node, dir, name) {
+  const c = world.querySelector(`.c[data-node="${node}"][data-port="${dir}"][data-name="${CSS.escape(name)}"]`);
+  if (!c) return null;
+  const a = c.getBoundingClientRect(), b = world.getBoundingClientRect(), z = S.view.z;
+  return [(a.left - b.left + a.width / 2) / z, (a.top - b.top + a.height / 2) / z];
+}
+
+function drawEdges() {
+  svg.innerHTML = S.edges.map((e, i) => {
+    const p = portXY(e.src, "out", e.src_port), q = portXY(e.dst, "in", e.dst_port);
+    if (!p || !q) return "";
+    const dx = Math.max(60, Math.abs(q[0] - p[0]) / 2);
+    const live = S.results[e.src] && S.results[e.src].status === "done";
+    return `<path data-edge="${i}" class="${live ? "live" : ""}" d="M${p[0]},${p[1]} C${p[0] + dx},${p[1]} ${q[0] - dx},${q[1]} ${q[0]},${q[1]}"/>`;
+  }).join("");
+}
+
+function layout() {
+  const depth = {}, ids = S.nodes.map(n => n.id);
+  ids.forEach(i => depth[i] = 0);
+  for (let k = 0; k < ids.length; k++) for (const e of S.edges) depth[e.dst] = Math.max(depth[e.dst], depth[e.src] + 1);
+  const cols = {};
+  for (const n of S.nodes) (cols[depth[n.id]] ||= []).push(n);
+  for (const [d, ns] of Object.entries(cols)) ns.forEach((n, j) => { n.x = 40 + d * 285; n.y = 70 + j * 190; });
+  render(); fit();
+}
+
+function addNode(n) { n.id ||= `${n.kind[0]}${Date.now() % 100000}${S.seq++}`; n.x ??= 60 + Math.random() * 200; n.y ??= 80 + Math.random() * 200; S.nodes.push(n); S.sel = n.id; render(); inspect(); }
+
+// ---- interactions
+let drag = null;
+world.addEventListener("mousedown", ev => {
+  const h = ev.target.closest(".nh"); if (!h) return;
+  const n = S.nodes.find(x => x.id === h.parentElement.dataset.id);
+  drag = {n, ox: ev.clientX / S.view.z - n.x, oy: ev.clientY / S.view.z - n.y};
+});
+const mainEl = document.querySelector("main");
+let pan = null;
+mainEl.addEventListener("mousedown", ev => {
+  if (ev.target.closest(".node,.toolbar") || ev.target.closest("path")) return;
+  pan = {x: ev.clientX - S.view.x, y: ev.clientY - S.view.y}; mainEl.classList.add("panning");
+});
+mainEl.addEventListener("wheel", ev => {
+  ev.preventDefault();
+  const r = mainEl.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top;
+  const z = Math.min(2, Math.max(0.3, S.view.z * (ev.deltaY < 0 ? 1.1 : 0.9)));
+  S.view.x = mx - (mx - S.view.x) * z / S.view.z; S.view.y = my - (my - S.view.y) * z / S.view.z; S.view.z = z; applyView();
+}, {passive: false});
+function applyView() { world.style.transform = `translate(${S.view.x}px,${S.view.y}px) scale(${S.view.z})`; }
+function fit() {
+  if (!S.nodes.length) return;
+  const r = mainEl.getBoundingClientRect();
+  const maxX = Math.max(...S.nodes.map(n => n.x + 240)), maxY = Math.max(...S.nodes.map(n => n.y + 200));
+  const minX = Math.min(...S.nodes.map(n => n.x)), minY = Math.min(...S.nodes.map(n => n.y));
+  const z = Math.min(1.1, (r.width - 60) / (maxX - minX), (r.height - 120) / (maxY - minY));
+  S.view = {z, x: (r.width - (maxX - minX) * z) / 2 - minX * z, y: Math.max(64, (r.height - (maxY - minY) * z) / 2) - minY * z}; applyView(); drawEdges();
+}
+window.addEventListener("mousemove", ev => {
+  if (pan) { S.view.x = ev.clientX - pan.x; S.view.y = ev.clientY - pan.y; applyView(); return; }
+  if (!drag) return;
+  drag.n.x = ev.clientX / S.view.z - drag.ox; drag.n.y = ev.clientY / S.view.z - drag.oy;
+  const el = world.querySelector(`.node[data-id="${drag.n.id}"]`); el.style.left = drag.n.x + "px"; el.style.top = drag.n.y + "px";
+  drawEdges();
+});
+window.addEventListener("mouseup", () => { drag = null; pan = null; mainEl.classList.remove("panning"); });
+
+world.addEventListener("click", async ev => {
+  const c = ev.target.closest(".c");
+  if (c) {
+    if (c.dataset.port === "out") { S.pending = {src: c.dataset.node, src_port: c.dataset.name}; world.querySelectorAll(".c.pending").forEach(x => x.classList.remove("pending")); c.classList.add("pending"); return; }
+    if (S.pending) {
+      S.edges = S.edges.filter(e => !(e.dst === c.dataset.node && e.dst_port === c.dataset.name));
+      S.edges.push({...S.pending, dst: c.dataset.node, dst_port: c.dataset.name}); S.pending = null; render(); validate(true);
+    }
+    return;
+  }
+  const p = ev.target.closest("path[data-edge]");
+  if (p) { S.edges.splice(+p.dataset.edge, 1); drawEdges(); return; }
+  const nd = ev.target.closest(".node");
+  if (nd && !ev.target.matches("input,a")) { S.sel = nd.dataset.id; render(); inspect(); }
+});
+svg.addEventListener("click", ev => { const p = ev.target.closest("path[data-edge]"); if (p) { S.edges.splice(+p.dataset.edge, 1); drawEdges(); } });
+
+world.addEventListener("change", ev => {
+  const id = ev.target.dataset.file; if (!id) return;
+  const f = ev.target.files[0]; S.files[id] = f;
+  const n = S.nodes.find(x => x.id === id);
+  if (n && (!n.mime || n.mime === "*/*")) n.mime = guessMime(f.name);
+  render();
+});
+function guessMime(name) {
+  const e = name.toLowerCase().split(".").pop();
+  return ({step: "model/step", stp: "model/step", csv: "text/csv", json: "application/json", glb: "model/gltf-binary",
+    html: "text/html", txt: "text/plain", md: "text/markdown", pdf: "application/pdf", png: "image/png"})[e] || "*/*";
+}
+
+$("#lib").addEventListener("click", ev => {
+  const it = ev.target.closest(".libitem"); if (!it) return;
+  const m = S.reg[it.dataset.tool];
+  if (m.verification.status !== "verified") {
+    $("#insp").innerHTML = `<h2 style="margin-top:0">${esc(m.id)} · not usable yet</h2>
+      <div class="errs">${esc(m.verification.log)}</div><h2>Node knowledge</h2><div class="md">${window.marked ? marked.parse(m.md || "") : `<pre>${esc(m.md)}</pre>`}</div>`;
+    return;
+  }
+  addNode({kind: "tool", tool: m.id, backend: "local", params: Object.fromEntries(m.inputs.filter(p => p.kind === "param").map(p => [p.name, p.default || ""]))});
+});
+document.querySelectorAll("[data-add]").forEach(b => b.onclick = () => {
+  const k = b.dataset.add;
+  addNode(k === "decide" ? {kind: "decide", question: "Does the report show problems?", options: "problems: mismatches or missing parts\nclean: every row matches"} : k === "input" ? {kind: "input", mime: "*/*", label: "Upload"} : k === "ai" ? {kind: "ai", prompt: "Summarize the input for a buyer", mime: "text/markdown"} : {kind: "output", label: "Output"});
+});
+
+// ---- inspector
+function inspect() {
+  const n = S.nodes.find(x => x.id === S.sel), I = $("#insp");
+  if (!n) { I.innerHTML = `<h2 style="margin-top:0">Inspector</h2><div class="hint">Click a node.</div>`; return; }
+  const res = S.results[n.id];
+  let h = `<h2 style="margin-top:0">${esc(n.kind)} · ${esc(n.id)}</h2><div class="row"><button class="btn" id="delNode">Delete node</button></div>`;
+  if (n.kind === "input") h += `<label class="f">Label</label><input type="text" data-k="label" value="${esc(n.label)}"><label class="f">Type</label><input type="text" data-k="mime" value="${esc(n.mime)}">`;
+  if (n.kind === "output") h += `<label class="f">Label</label><input type="text" data-k="label" value="${esc(n.label)}">`;
+  if (n.kind === "decide") h += `<label class="f">Question</label><textarea data-k="question">${esc(n.question)}</textarea>
+    <label class="f">Options, one per line: <code>name: what it means</code></label><textarea data-k="options" style="min-height:90px">${esc(typeof n.options === "string" ? n.options : Object.entries(n.options || {}).map(([k, v]) => k + ": " + v).join("\n"))}</textarea>
+    <div class="hint">The input file is routed, unchanged, to the chosen option's port. Branches not taken are skipped. Decided by the decision engine (Laya / LLM / heuristic, see AI settings).</div>`;
+  if (n.kind === "ai") h += `<label class="f">Prompt</label><textarea data-k="prompt">${esc(n.prompt)}</textarea><label class="f">Output type</label>
+    <select data-k="mime">${["text/markdown", "application/json", "text/html", "text/csv"].map(m => `<option ${m === n.mime ? "selected" : ""}>${m}</option>`).join("")}</select>
+    <div class="hint">Routes this step to the configured LLM instead of a tool.</div>`;
+  if (n.kind === "tool") {
+    const m = S.reg[n.tool];
+    h += `<label class="f">Run on</label><select data-k="backend">${["local", "docker", "remote"].map(b => `<option ${b === (n.backend || "local") ? "selected" : ""}>${b}</option>`).join("")}</select>`;
+    if (n.backend === "remote") h += `<label class="f">Worker URL</label><input type="text" data-k="remote_url" value="${esc(n.remote_url || "")}" placeholder="http://gpu-box:8800">`;
+    const ps = m.inputs.filter(p => p.kind === "param");
+    if (ps.length) h += `<label class="f">Parameters</label>` + ps.map(p => `<label class="f">${esc(p.name)}${p.required ? " *" : ""}</label><input type="text" data-param="${esc(p.name)}" value="${esc((n.params || {})[p.name] ?? "")}" placeholder="${esc(p.description)}">`).join("");
+    h += `<div class="itabs"><button data-itab="d" class="${S.itab !== "s" ? "on" : ""}">Node knowledge</button><button data-itab="s" class="${S.itab === "s" ? "on" : ""}">Skill (for LLMs)</button></div>
+      <div id="itabBody">${S.itab === "s" ? `<div class="hint">loading…</div>` : `<div class="md">${window.marked ? marked.parse(m.md || "") : `<pre>${esc(m.md)}</pre>`}</div>`}</div>`;
+  }
+  if (res) {
+    h += `<h2>Last run · ${esc(res.status)}</h2>`;
+    if (res.errors && res.errors.length) h += `<div class="errs">${esc(res.errors.join("\n"))}</div>`;
+    for (const [port, url] of Object.entries(res.urls || {})) {
+      h += `<div class="row"><a class="outlink" target="_blank" href="${url}">${esc(port)}: ${esc(url.split("/").pop())}</a></div>`;
+      if (/\.glb$/i.test(url)) h += `<model-viewer src="${url}" camera-controls auto-rotate></model-viewer>`;
+      else if (/\.html?$/i.test(url)) h += `<iframe class="preview" src="${url}"></iframe>`;
+      else if (/\.(json|csv|md|txt)$/i.test(url)) h += `<pre class="log" data-src="${url}">loading…</pre>`;
+    }
+    if (res.log) h += `<h2>Log</h2><div class="log">${esc(res.log)}</div>`;
+  }
+  I.innerHTML = h;
+  if (n.kind === "tool") {
+    I.querySelectorAll("[data-itab]").forEach(b => b.onclick = () => { S.itab = b.dataset.itab; inspect(); });
+    if (S.itab === "s") loadSkill(n.tool, I.querySelector("#itabBody"));
+  }
+  I.querySelectorAll("pre[data-src]").forEach(async p => { p.textContent = (await (await fetch(p.dataset.src)).text()).slice(0, 4000); });
+  I.querySelector("#delNode").onclick = () => { S.nodes = S.nodes.filter(x => x.id !== n.id); S.edges = S.edges.filter(e => e.src !== n.id && e.dst !== n.id); S.sel = null; render(); inspect(); };
+  I.querySelectorAll("[data-k]").forEach(el => el.onchange = () => { n[el.dataset.k] = el.value; render(); if (el.dataset.k === "backend") inspect(); });
+  I.querySelectorAll("[data-param]").forEach(el => el.onchange = () => { (n.params ||= {})[el.dataset.param] = el.value; });
+}
+
+// ---- actions
+function graphJSON() { return {nodes: S.nodes.map(({x, y, ...r}) => r), edges: S.edges}; }
+
+async function validate(quiet) {
+  const {errors} = await api("/api/validate", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify(graphJSON())});
+  $("#planNote").innerHTML = errors.length ? `<div class="errs">${esc(errors.join("\n"))}</div>` : (quiet ? "" : `<span style="color:var(--ok)">Graph is valid.</span>`);
+  return errors;
+}
+
+$("#planBtn").onclick = async () => {
+  $("#planNote").textContent = "planning…";
+  try {
+    const {graph, errors} = await api("/api/plan", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({request: $("#ask").value})});
+    S.nodes = graph.nodes; S.edges = graph.edges; S.results = {}; S.files = {}; S.sel = null;
+    layout(); inspect();
+    $("#planNote").innerHTML = `Planned by <b>${esc(graph.planner)}</b>. ${graph.note ? esc(graph.note) : ""}` +
+      (graph.decisions || []).map(d => `<div class="dec">${esc(d.question)} → <b>${esc(d.choice)}</b> (${esc(d.backend)}, ${(+d.confidence).toFixed(2)})${d.used ? "" : " · not confident, kept " + esc(d.kept)}</div>`).join("") + (errors.length ? `<div class="errs">${esc(errors.join("\n"))}</div>` : " Upload the inputs, then Run.");
+  } catch (e) { $("#planNote").innerHTML = `<div class="errs">${esc(e.message)}</div>`; }
+};
+
+$("#runBtn").onclick = async () => {
+  if ((await validate(true)).length) return;
+  const fd = new FormData();
+  fd.append("graph", JSON.stringify(graphJSON()));
+  for (const [id, f] of Object.entries(S.files)) if (S.nodes.some(n => n.id === id)) fd.append("file:" + id, f);
+  S.results = {}; S.nodes.forEach(n => S.results[n.id] = {status: "running"}); render();
+  $("#status").textContent = "running…";
+  try {
+    const r = await api("/api/run", {method: "POST", body: fd});
+    S.results = r.nodes || {};
+    if (r.errors) $("#planNote").innerHTML = `<div class="errs">${esc(r.errors.join("\n"))}</div>`;
+    $("#status").textContent = r.ok ? `run ${r.run}: all nodes done` : `run ${r.run || ""}: some nodes failed`;
+    const firstOut = [...S.nodes].reverse().find(n => n.kind === "output" && S.results[n.id] && S.results[n.id].status === "done");
+    if (firstOut) S.sel = firstOut.id;
+  } catch (e) { $("#status").textContent = "run error"; $("#planNote").innerHTML = `<div class="errs">${esc(e.message)}</div>`; S.results = {}; }
+  render(); inspect();
+};
+$("#valBtn").onclick = () => validate(false);
+$("#layoutBtn").onclick = layout;
+$("#fitBtn").onclick = fit;
+$("#clearBtn").onclick = () => { S.nodes = []; S.edges = []; S.results = {}; S.files = {}; S.sel = null; render(); inspect(); };
+
+$("#obBtn").onclick = async () => {
+  if ($("#obBtn").disabled) return;
+  $("#obBtn").disabled = true; $("#obBtn").textContent = "Analyzing…";
+  try { await onboardNow(); } finally { $("#obBtn").disabled = false; $("#obBtn").textContent = "Analyze & verify"; }
+};
+async function onboardNow() {
+  const fd = new FormData();
+  fd.append("path", $("#obPath").value);
+  if ($("#obZip").files[0]) fd.append("archive", $("#obZip").files[0]);
+  $("#insp").innerHTML = `<h2 style="margin-top:0">Onboarding</h2><div class="log">analyzing, building, running on samples…</div>`;
+  try {
+    const r = await api("/api/onboard", {method: "POST", body: fd});
+    $("#insp").innerHTML = `<h2 style="margin-top:0">Onboarding result</h2><div class="log">${esc(r.log)}</div>`;
+  } catch (e) { $("#insp").innerHTML = `<h2 style="margin-top:0">Onboarding failed</h2><div class="errs">${esc(e.message)}</div>`; }
+  try { await loadReg(); } catch (e) { $("#status").textContent = "could not refresh node list: " + e.message; }
+}
+
+
+// ---- skills
+async function loadSkill(id, box) {
+  try {
+    const r = await api(`/api/nodes/${encodeURIComponent(id)}/skill`);
+    box.innerHTML = `<div class="row" style="margin:0 0 8px"><button class="btn sm" id="skCopy">Copy</button>
+      <a class="btn sm" id="skDl" download="SKILL.md" style="text-decoration:none">Download</a>
+      <span class="hint" style="margin:0 0 0 auto">${r.generated ? "saved in registry" : "preview, not saved yet"}</span></div>
+      <div class="md">${window.marked ? marked.parse(r.skill.replace(/^---[\s\S]*?---\n/, m => "```yaml\n" + m.replace(/---\n?/g, "") + "```\n")) : `<pre>${esc(r.skill)}</pre>`}</div>`;
+    box.querySelector("#skCopy").onclick = e => { navigator.clipboard?.writeText(r.skill); e.target.textContent = "Copied"; };
+    box.querySelector("#skDl").href = "data:text/markdown;charset=utf-8," + encodeURIComponent(r.skill);
+  } catch (e) { box.innerHTML = `<div class="errs">${esc(e.message)}</div>`; }
+}
+async function busy(btn, label, fn) {
+  const old = btn.textContent; btn.disabled = true; btn.textContent = label;
+  try { return await fn(); } finally { btn.disabled = false; btn.textContent = old; }
+}
+$("#skGen").onclick = e => busy(e.target, "Generating…", async () => {
+  try { const r = await api("/api/skills/generate", {method: "POST"}); $("#skOut").innerHTML = `<span class="ok">Wrote ${r.nodes.length} node skills, the playbook and the index.</span>`; }
+  catch (x) { $("#skOut").innerHTML = `<div class="errs">${esc(x.message)}</div>`; }
+});
+$("#skCheck").onclick = e => busy(e.target, "Checking…", async () => {
+  try {
+    const r = await api("/api/skills/check");
+    const misses = Object.entries(r.by_node).flatMap(([id, v]) => v.cases.filter(c => c.verdict === "miss").map(c => ({id, ...c})));
+    $("#skOut").innerHTML = `<div>Sample requests: <b>${r.hit}/${r.of}</b> led the planner to the intended node, <b>${r.alternative}</b> to another valid node that makes the same type, <b>${misses.length}</b> missed.</div>` +
+      (r.alternative ? `<div class="hint">“Another valid node” means the request alone cannot tell similar nodes apart. Sharper descriptions fix that.</div>` : "") +
+      misses.slice(0, 6).map(c => `<div class="dec"><b>${esc(c.id)}</b> “${esc(c.request)}” → ${esc(c.plan.slice(0, 3).join(", ") || "nothing")}</div>`).join("");
+  } catch (x) { $("#skOut").innerHTML = `<div class="errs">${esc(x.message)}</div>`; }
+});
+
+// ---- crawl / wrap
+function crawlTable(r) {
+  const rows = r.units.map(u => `<tr><td><span class="badge ${u.action}">${u.action}</span></td><td><code>${esc(u.path)}${u.function ? ":" + esc(u.function) : ""}</code><div class="sub">${esc(u.why)}</div></td></tr>`).join("");
+  const res = (r.results || []).map(x => `<div class="${x.status === "verified" ? "ok" : "errs"}">${esc(x.id)}: ${esc(x.status)}${x.error ? " · " + esc(x.error) : ""}</div>`).join("");
+  return `<h2 style="margin-top:0">Crawl · ${esc(r.name)}</h2><div class="sub">${esc(r.summary || "")}</div>
+    <table class="res">${rows || `<tr><td>Nothing that looks like a tool was found.</td></tr>`}</table>
+    ${res ? `<h2>Onboarding</h2>${res}` : `<div class="hint">Read only so far; nothing was executed. Use “Scan &amp; onboard all” to verify them by running.</div>`}`;
+}
+async function doCrawl(run, btn) {
+  const src = $("#crPath").value.trim(); if (!src) return;
+  const fd = new FormData(); fd.append("source", src); fd.append("run", run ? "1" : "0");
+  $("#insp").innerHTML = `<h2 style="margin-top:0">Crawling</h2><div class="log">${run ? "reading, onboarding and verifying (this runs the tools)…" : "reading the code…"}</div>`;
+  await busy(btn, run ? "Working…" : "Reading…", async () => {
+    try {
+      const r = await api("/api/crawl", {method: "POST", body: fd});
+      $("#insp").innerHTML = crawlTable(r.report) + `<h2>Log</h2><div class="log tall">${esc(r.log)}</div>`;
+      await loadReg(); if (run) setTab("lib");
+    } catch (e) { $("#insp").innerHTML = `<h2 style="margin-top:0">Crawl failed</h2><div class="errs">${esc(e.message)}</div>`; }
+  });
+}
+$("#crScan").onclick = e => doCrawl(false, e.target);
+$("#crRun").onclick = e => doCrawl(true, e.target);
+
+$("#wrFind").onclick = e => busy(e.target, "Reading…", async () => {
+  try {
+    const fns = await api("/api/wrap/discover?path=" + encodeURIComponent($("#wrPath").value.trim()));
+    $("#wrList").innerHTML = fns.length ? fns.map(f => `<div class="fnrow"><div><b>${esc(f.function)}</b><div class="m">${esc(f.problems.length ? f.problems[0] : (f.doc.split("\n")[0] || f.params.map(p => p.name).join(", ")))}</div></div>
+      ${f.problems.length ? "" : `<button class="btn sm go" data-wrap="${esc(f.function)}">Wrap</button>`}</div>`).join("") : `<div class="hint">No public functions found.</div>`;
+  } catch (x) { $("#wrList").innerHTML = `<div class="errs">${esc(x.message)}</div>`; }
+});
+$("#wrList").onclick = async ev => {
+  const b = ev.target.closest("[data-wrap]"); if (!b) return;
+  const fd = new FormData(); fd.append("path", $("#wrPath").value.trim()); fd.append("function", b.dataset.wrap);
+  await busy(b, "Wrapping…", async () => {
+    try {
+      const r = await api("/api/wrap", {method: "POST", body: fd});
+      $("#insp").innerHTML = `<h2 style="margin-top:0">Wrapped · ${esc(r.node)}</h2><div class="${r.status === "verified" ? "ok" : "errs"}">${esc(r.status)}</div><div class="log tall">${esc(r.log)}</div>`;
+      await loadReg();
+    } catch (x) { $("#insp").innerHTML = `<h2 style="margin-top:0">Wrap failed</h2><div class="errs">${esc(x.message)}</div>`; }
+  });
+};
+
+// ---- AI settings
+async function loadSettings() {
+  try {
+    const s = await api("/api/settings");
+    $("#sProv").value = s.llm.provider || "none"; $("#sModel").value = s.llm.model || ""; $("#sBase").value = s.llm.base_url || "";
+    $("#sKey").value = s.llm.api_key || ""; $("#sDec").value = s.decider || "auto";
+    $("#sLaya").value = (s.laya || {}).model || ""; $("#sConf").value = (s.laya || {}).min_confidence || "";
+  } catch (e) { /* settings are optional */ }
+}
+$("#sSave").onclick = async () => {
+  $("#sOut").textContent = "saving and testing…";
+  const body = {llm: {provider: $("#sProv").value === "none" ? "none" : $("#sProv").value, model: $("#sModel").value.trim(),
+                      base_url: $("#sBase").value.trim(), api_key: $("#sKey").value.trim()},
+                decider: $("#sDec").value, laya: {model: $("#sLaya").value.trim(), min_confidence: parseFloat($("#sConf").value) || 0.5}};
+  try {
+    await api("/api/settings", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify(body)});
+    const t = await api("/api/settings/test", {method: "POST"});
+    const l = t.llm, d = t.decision_test || {};
+    $("#sOut").innerHTML = (l.ok ? `<div class="ok">LLM OK: ${esc(l.provider)} · ${esc(l.model)} replied “${esc(l.reply)}”</div>`
+                                 : `<div class="errs">LLM: ${esc(l.error)}</div>`) +
+      `<div>Decision engine order: ${esc((t.decider.order || []).join(" → "))}${t.decider.laya_installed ? "" : " (Laya not installed: <code>pip install laya</code>)"}</div>` +
+      (d.error ? `<div class="errs">decision test: ${esc(d.error)}</div>` : `<div>decision test → ${esc(d.choice)} by ${esc(d.backend)}${(d.errors || []).length ? " (fell back: " + esc(d.errors.join("; ")) + ")" : ""}</div>`);
+    await loadSettings(); await loadReg();
+  } catch (e) { $("#sOut").innerHTML = `<div class="errs">${esc(e.message)}</div>`; }
+};
+
+window.addEventListener("resize", drawEdges);
+document.addEventListener("keydown", e => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && Q.tab === "build") $("#planBtn").click(); });
+window.addEventListener("error", e => banner(e.message));
+window.addEventListener("unhandledrejection", e => banner(e.reason && e.reason.message || String(e.reason)));
+function banner(msg) {
+  let b = $("#errBanner");
+  if (!b) { b = document.createElement("div"); b.id = "errBanner"; b.style.cssText = "position:fixed;bottom:12px;left:50%;transform:translateX(-50%);background:#3b1e22;border:1px solid var(--bad);color:var(--text);padding:8px 14px;border-radius:9px;z-index:99;max-width:80vw;font-size:12px"; document.body.appendChild(b); }
+  b.textContent = "UI error: " + msg;
+}
+loadReg().catch(() => {}); loadSettings();
+</script>
+</body>
+</html>

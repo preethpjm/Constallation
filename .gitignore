@@ -1,0 +1,8 @@
+nodeforge.settings.json
+registry/*
+!registry/.gitkeep
+runs/*
+!runs/.gitkeep
+uploaded_tools/
+__pycache__/
+.venv/

@@ -1,0 +1,5 @@
+part_number,description,quantity,unit_price,supplier
+BR-201,Steel bracket,1,12.50,Acme Metals
+SC-M6,Screw M6x20,4,0.10,FastenCo
+WS-M6,Washer M6,1,0.05,FastenCo
+GK-010,Rubber gasket,2,0.80,SealPro

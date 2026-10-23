@@ -1,0 +1,3 @@
+part_number,name,bom_qty,cad_qty,unit_price,supplier,status
+BR-201,Steel Bracket,1,1,12.5,Acme Metals,match
+GK-010,Rubber gasket,2,0,0.8,SealPro,missing_in_cad

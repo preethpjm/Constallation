@@ -1,0 +1,7 @@
+{
+  "name": "bom-compare",
+  "version": "0.3.0",
+  "description": "Compare purchasing BOM csv with CAD parts json, aggregate cost",
+  "bin": { "bom-compare": "index.js" },
+  "scripts": { "test": "node index.js test/bom.csv test/parts.json /tmp/bomtest" }
+}

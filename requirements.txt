@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+python-multipart
+pydantic>=2
+httpx
+# optional, only if you want the LLM agent / planner:
+anthropic
+openai
+# optional decision engine (local model, pulls in torch):
+# laya

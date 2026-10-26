@@ -17,6 +17,7 @@ import shutil
 
 from . import interp, llm, probe, runner, sandbox
 from .manifest import Manifest, Port, Runtime, Verification, save
+from . import fixtures
 from .types import EXT_MIME, WORD_MIME, MIME_EXT, sniff
 
 OUT_WORDS = {"out", "output", "outdir", "dest", "destination", "result", "results", "target", "save"}
@@ -27,6 +28,7 @@ VENV_PY = r".venv\Scripts\python.exe" if os.name == "nt" else ".venv/bin/python"
 FIXTURES = {"text/plain": "the quick brown fox jumps over the lazy dog\nsecond line of sample text\n",
             "text/markdown": "# Sample\n\nSome *sample* text.\n",
             "text/csv": "id,name,quantity,price\n1,alpha,2,3.5\n2,beta,1,10\n",
+            "image/svg+xml": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40"/></svg>\n',
             "application/json": '{"id": 1, "name": "alpha", "items": [{"sku": "a", "qty": 2}, {"sku": "b", "qty": 1}]}\n'}
 BASE_IMAGES = {"python": "python:3.12-slim", "node": "node:22-slim", "shell": "debian:stable-slim",
                "c": "gcc:14", "cpp": "gcc:14", "go": "golang:1.23", "rust": "rust:1",
@@ -331,10 +333,13 @@ def verify(m: Manifest, discover: bool = False) -> Manifest:
         return m
     ad = runner.app_dir(m)
     for p in m.file_inputs():  # no shipped sample? synthesize one for simple text types
-        if p.required and p.name not in m.verification.example_inputs and p.mime in FIXTURES:
+        if p.required and p.name not in m.verification.example_inputs and (p.mime in FIXTURES or p.mime in fixtures.BINARY):
             rel = f"_nodeforge_fixtures/{p.name}{MIME_EXT.get(p.mime, '.txt')}"
             os.makedirs(os.path.join(ad, "_nodeforge_fixtures"), exist_ok=True)
-            open(os.path.join(ad, rel), "w").write(FIXTURES[p.mime])
+            if p.mime in fixtures.BINARY:
+                open(os.path.join(ad, rel), "wb").write(fixtures.BINARY[p.mime]())
+            else:
+                open(os.path.join(ad, rel), "w").write(FIXTURES[p.mime])
             m.verification.example_inputs[p.name] = rel
     missing = [p.name for p in m.file_inputs() if p.required and p.name not in m.verification.example_inputs]
     if missing:
@@ -358,6 +363,9 @@ def verify(m: Manifest, discover: bool = False) -> Manifest:
                     continue
                 rel = os.path.relpath(p, outdir).replace(os.sep, "/")
                 name = slug(os.path.splitext(rel)[0]).replace("-", "_") or "out"
+                in_stems = {slug(os.path.splitext(os.path.basename(v))[0]).replace("-", "_") for v in m.verification.example_inputs.values()}
+                if name in in_stems or name in {q.name for q in m.inputs}:   # named after the input, not meaningful
+                    name = "out_" + (os.path.splitext(rel)[1].lstrip(".").lower() or "file")
                 while name in taken:
                     name += "_2"
                 taken.add(name)
@@ -377,9 +385,10 @@ def verify(m: Manifest, discover: bool = False) -> Manifest:
     m.verification.status = "verified" if res["ok"] else "failed"
     m.verification.log = (res["log"][-3000:] + ("\nERRORS: " + "; ".join(res["errors"]) if res["errors"] else ""))
     # tighten declared mimes to what we actually observed
+    pinned = set((_hints(m.tool_dir).get("outputs") or {}))
     for o in m.outputs:
         obs = m.verification.observed_outputs.get(o.name)
-        if obs and o.mime in ("*/*", "text/plain"):
+        if obs and o.mime in ("*/*", "text/plain") and o.name not in pinned:
             o.mime = obs
     return m
 
@@ -569,8 +578,14 @@ def _onboard(tool_dir: str, nid: str, use_llm: bool, log) -> list[Manifest]:
             results.append(_finish(verify(d), ev, use_llm, log))
         if results:
             return results
+    manual = _manifest_from_hints(tool_dir, nid)
+    if manual:   # the author described the tool: nothing is started to find out how it works
+        log(f"[{nid}] using constellation.json: {manual.runtime.command}")
+        return [_finish(verify(manual, discover=True), ev, use_llm, log)]
     probe.probe_help(ev)
-    runnable = [c for c in ev["entry_candidates"] if c.get("invoke") and not c.get("runtime_problem")]
+    for line in ev.get("probed", []):
+        log(f"[{nid}] {line}")
+    runnable = [c for c in ev["entry_candidates"] if c.get("invoke") and not c.get("runtime_problem") and not c.get("no_probe")]
     if not runnable:
         problems = sorted({c["runtime_problem"] for c in ev["entry_candidates"] if c.get("runtime_problem")})
         why = ("this machine can't run it: " + " | ".join(problems)) if problems else \
@@ -584,9 +599,56 @@ def _onboard(tool_dir: str, nid: str, use_llm: bool, log) -> list[Manifest]:
         return [_finish(m, ev, use_llm, log)]
     cand = runnable[0]
     m = draft_cli(ev, cand, nid)
+    _apply_hints(m)
     log(f"[{nid}] draft command: {m.runtime.command}")
     m = verify(m, discover=True)
     return [_finish(m, ev, use_llm, log)]
+
+
+def _hints(tool_dir: str) -> dict:
+    """Optional constellation.json next to a tool: the author states what the code cannot show.
+    {"description": "...", "tags": [...], "inputs": {"port": {"mime": "*/*"}}, "outputs": {"port": {"mime": "text/plain"}}}"""
+    p = os.path.join(tool_dir, "constellation.json") if os.path.isdir(tool_dir) else ""
+    try:
+        return json.load(open(p, encoding="utf-8")) if p and os.path.exists(p) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _manifest_from_hints(tool_dir: str, nid: str):
+    """constellation.json with a "command" describes the whole node, for tools that cannot be probed safely
+    (installers, C++ engines behind a Python wrapper, big folders of DLLs):
+    {"command": "python server_cli.py {model} --out {outdir}",
+     "inputs":  {"model": {"mime": "model/step", "kind": "file"}, "scale": {"kind": "param", "default": "1"}},
+     "outputs": {"glb": {"mime": "model/gltf-binary", "path": "{outdir}/out.glb"}},
+     "example_inputs": {"model": "examples/a.step"}, "setup": []}"""
+    h = _hints(tool_dir)
+    if not h.get("command"):
+        return None
+    ins = [Port(name=k, kind=v.get("kind", "file"), mime=v.get("mime", "*/*"), description=v.get("description", ""),
+                required=v.get("required", v.get("kind", "file") != "param"), default=v.get("default"))
+           for k, v in (h.get("inputs") or {}).items()]
+    outs = [Port(name=k, mime=v.get("mime", "*/*"), description=v.get("description", ""),
+                 path=v.get("path") or "{outdir}/" + k) for k, v in (h.get("outputs") or {}).items()]
+    cmd = h["command"].replace("{python}", interp.resolve("python")[0] or "python")
+    return Manifest(id=nid, name=nid, description=h.get("description", ""), tool_dir=tool_dir, language=h.get("language", "unknown"),
+                    inputs=ins, outputs=outs, tags=h.get("tags", []),
+                    runtime=Runtime(kind="cli", command=cmd, setup=h.get("setup", []), timeout_s=h.get("timeout_s", 600)),
+                    verification=Verification(example_inputs=h.get("example_inputs", {}), example_params=h.get("example_params", {})))
+
+
+def _apply_hints(m: Manifest):
+    h = _hints(m.tool_dir)
+    if h.get("description"):
+        m.description = h["description"]
+    m.tags = sorted(set(m.tags) | set(h.get("tags", [])))
+    for group, ports in (("inputs", m.inputs), ("outputs", m.outputs)):
+        for p in ports:
+            ov = (h.get(group) or {}).get(p.name) or {}
+            if ov.get("mime"):
+                p.mime = ov["mime"]
+            if ov.get("description"):
+                p.description = ov["description"]
 
 
 def _finish(m: Manifest, ev, use_llm, log):

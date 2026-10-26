@@ -22,6 +22,7 @@ import re
 import shutil
 
 from . import sandbox
+from .types import EXT_MIME
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WRAP_DIR = os.path.join(ROOT, "wrapped")
@@ -32,9 +33,14 @@ PATH_NAMES = {"path", "file", "filename", "filepath", "file_path", "input", "inp
               "src", "src_path", "fname", "input_file"}
 OUT_NAMES = {"out", "output", "output_path", "out_path", "dest", "dst", "destination", "outfile", "out_file",
              "output_file", "target"}
-KIND_HINT = {"csv": "csv", "json": "json", "markdown": "md", "md": "md", "html": "html", "xml": "xml"}
-EXT = {"csv": ".csv", "json": ".json", "txt": ".txt", "md": ".md", "html": ".html", "xml": ".xml", "bin": ".bin"}
+KIND_HINT = {"csv": "csv", "json": "json", "markdown": "md", "md": "md", "html": "html", "xml": "xml", "svg": "svg"}
+EXT = {"csv": ".csv", "json": ".json", "txt": ".txt", "md": ".md", "html": ".html", "xml": ".xml", "svg": ".svg", "bin": ".bin"}
 NOISY_IMPORTS = {"requests", "urllib", "socket", "subprocess", "smtplib", "ftplib", "http", "paramiko", "boto3"}
+
+
+def _is(n, names):
+    """exact name, or its last word (cgm_text, svg_path, src_file) is a known name"""
+    return n in names or n.rsplit("_", 1)[-1] in names
 
 
 def _ann(node) -> str:
@@ -88,7 +94,7 @@ def discover(path: str) -> list[dict]:
         io = sorted((imports | used) & NOISY_IMPORTS & used)
         body_src = ast.unparse(fn)
         has_return = any(isinstance(n, ast.Return) and n.value is not None for n in ast.walk(fn))
-        has_out = any(p["name"] in OUT_NAMES for p in params)
+        has_out = any(_is(p["name"], OUT_NAMES) for p in params)
         if not (has_return or has_out):
             problems.append("returns nothing and writes no output parameter")
         for p in params:
@@ -99,7 +105,7 @@ def discover(path: str) -> list[dict]:
         score += 3 if doc else 0
         score += 2 if ret else 0
         score += 2 if all(p["ann"] for p in params) and params else 0
-        score += 2 if any(p["name"] in TEXT_NAMES | PATH_NAMES for p in params) else 0
+        score += 2 if any(_is(p["name"], TEXT_NAMES | PATH_NAMES) for p in params) else 0
         score -= 4 * len(io)
         score -= 5 if re.search(r"\b(open|os\.remove|shutil\.rmtree|os\.system)\(", body_src) and not has_out else 0
         out.append({"function": fn.name, "file": path, "doc": doc, "params": params, "returns": ret,
@@ -111,6 +117,9 @@ def _kind_of(name: str, ann: str = "") -> str:
     for w in re.split(r"[^a-z0-9]+", name.lower()):
         if w in KIND_HINT:
             return KIND_HINT[w]
+    for w in re.split(r"[^a-z0-9]+", name.lower()):   # a file-type word: cgm_text, step_path ...
+        if w and "." + w in EXT_MIME and w not in ("txt", "md"):
+            return w
     return "txt"
 
 
@@ -139,7 +148,7 @@ def shim_source(fn: dict, module: str) -> tuple[str, dict]:
     for p in fn["params"]:
         n, ann = p["name"], p["ann"].replace(" ", "")
         is_str = ann in ("", "str", "Path", "Optional[str]", "str|None", "Optional[Path]")
-        if n in OUT_NAMES and is_str:
+        if _is(n, OUT_NAMES) and is_str:
             out_param = n
             continue
     ret_kind = _ret_kind(fn)
@@ -151,14 +160,14 @@ def shim_source(fn: dict, module: str) -> tuple[str, dict]:
             call.append(f'{n}=a.out_{ret_kind}')
             plan["output"] = f"out_{ret_kind}"
             continue
-        if is_str and n in TEXT_NAMES:
+        if is_str and _is(n, TEXT_NAMES):
             k = _kind_of(n) if _kind_of(n) != "txt" else _kind_of(fn["function"].split("_to_")[0])
             flag = f"in_{k}" if f"in_{k}" not in taken else f"in_{k}_{n}"
             taken.add(flag)
             lines.append(f'    ap.add_argument("--{flag}", required={not p["has_default"]}, help="input {k} file (read as text)")')
             call.append(f'{n}=read_text(a.{flag})')
             plan["inputs"].append(flag)
-        elif is_str and n in PATH_NAMES:
+        elif is_str and _is(n, PATH_NAMES):
             k = _kind_of(n) if _kind_of(n) != "txt" else "txt"
             flag = f"in_{k}" if f"in_{k}" not in taken else f"in_{k}_{n}"
             taken.add(flag)

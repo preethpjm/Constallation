@@ -1,0 +1,19 @@
+services:
+  constellation:
+    build: .
+    image: constellation:latest
+    ports: ["8800:8800"]
+    restart: unless-stopped
+    volumes:
+      - ./registry:/app/registry
+      - ./runs:/app/runs
+      - ./wrapped:/app/wrapped
+      - ./crawled:/app/crawled
+      - ./data:/app/data
+    environment:
+      # optional: point at a local model on the host (Ollama) or set a key
+      # NODEFORGE_LLM: openai
+      # OPENAI_BASE_URL: http://host.docker.internal:11434/v1
+      # NODEFORGE_MODEL: llama3.1:8b
+      CONSTELLATION_HOST: 0.0.0.0
+    extra_hosts: ["host.docker.internal:host-gateway"]

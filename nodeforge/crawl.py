@@ -160,7 +160,7 @@ def _libraries(root: str, claimed_units: list[dict], limit: int) -> list[dict]:
 
 
 def crawl(source: str, onboard_units: bool = False, make_skills: bool = True, max_units: int = 12,
-          use_llm: bool = True, log=print) -> dict:
+          use_llm: bool = True, log=print, skip_existing: bool = False) -> dict:
     path, name = fetch(source, log)
     log(f"reading {path} (nothing is executed in this step)")
     ev_root = probe.scan(path)
@@ -180,9 +180,14 @@ def crawl(source: str, onboard_units: bool = False, make_skills: bool = True, ma
         log(f"  {u['action']:8} {u['kind']:8} {u['path']}" + (f":{u['function']}" if u.get("function") else "") + f"  - {u['why']}")
     if onboard_units:
         from .onboard import onboard
+        from .manifest import load_all
+        have = {k: m for k, m in load_all().items() if m.verification.status == "verified"}
         for u in report["units"]:
             if u["action"] == "onboard":
                 target = os.path.join(path, u["path"]) if u["path"] != "." else path
+                if skip_existing and any(os.path.normpath(m.tool_dir).startswith(os.path.normpath(target)) for m in have.values()):
+                    log(f"  already registered, skipping {u['path']}")
+                    continue
                 if u["kind"] == "script":
                     target = os.path.join(path, u["path"])
                 ms = onboard(target, f"{name}-{slug(os.path.splitext(os.path.basename(u['path']))[0] or name)}",
@@ -191,6 +196,9 @@ def crawl(source: str, onboard_units: bool = False, make_skills: bool = True, ma
                     m.origin = m.origin or ""
                     report["results"].append({"id": m.id, "status": m.verification.status})
             elif u["action"] == "wrap":
+                if skip_existing and f"{name}-{slug(u['function'])}" in have:
+                    log(f"  already registered, skipping {u['function']}")
+                    continue
                 try:
                     m = wrap.wrap(os.path.join(path, u["path"]), u["function"],
                                   f"{name}-{slug(u['function'])}", use_llm=use_llm, log=log)

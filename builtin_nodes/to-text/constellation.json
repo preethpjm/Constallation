@@ -1,0 +1,6 @@
+{
+  "description": "Saves any text-based file (SVG, XML, HTML, JSON, CSV, Markdown) as a plain .txt file that contains its source code. Use at the end of a pipeline when the result must be a txt, for example cgm to svg to txt.",
+  "tags": ["svg", "txt", "text", "convert", "source", "code", "save", "xml", "html", "markdown"],
+  "inputs": {"input_file": {"mime": "*/*", "description": "any text-based file (svg, xml, html, json, csv, markdown)"}},
+  "outputs": {"output_txt": {"mime": "text/plain", "description": "the same content as a .txt file"}}
+}

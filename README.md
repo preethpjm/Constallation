@@ -18,6 +18,8 @@ Run `python cli.py doctor` first: it shows which runtimes actually work on this 
 stub. C/C++ tools need **MinGW-w64 gcc** on PATH (e.g. via MSYS2). Without those, those tools are reported as
 "this machine can't run it: ..." instead of being guessed at, and the planner tells you which step is missing.
 
+> **Run it:** `start.bat` (Windows) or `./start.sh` (Mac/Linux), or `docker compose up -d --build`. See SHIPPING.md.
+
 ## How it works
 
 ```
@@ -133,3 +135,29 @@ python cli.py skills --check --zip skills.zip
 - Crawling reads code statically, but `--run` executes what it found (in the onboarding sandbox, not a container). Use a disposable machine for repos you don't trust.
 - Wrappers cover Python functions only so far, and only simple parameter types (str/int/float/bool/Path).
 - The heuristic planner picks one node per requested type; when several nodes make the same type, a sharper description or the LLM/Laya decision decides.
+
+## Previews, controls and keyboard
+- Nodes preview what they hold: GLB/glTF as an orbitable 3D viewer, SVG/PNG/JPG as images, HTML, CSV tables, JSON/text. Anything else (CGM, STEP, binaries) shows a file card; the converter's output is what gets rendered.
+- Tool parameters become controls on the node: colour picker, number, slider, toggle, dropdown. A manifest param can set `widget` (`color`, `number`, `bool`, `range:0-1`, `select:a|b|c`, `area`); otherwise it is inferred from the name/default.
+- AI nodes pick their own model (list comes from your Ollama/OpenAI-compatible server or Anthropic).
+- Keyboard: `Shift+Enter` or `Ctrl+K` opens the command bar (type a request and Enter to build, or search nodes/commands), `Ctrl+B` collapses the side panel, `/` opens the bar, `Ctrl+Enter` runs, `F` fits, `Ctrl+Z` undo.
+
+## Built-in nodes and `constellation.json`
+- `builtin_nodes/to-text` ships with Constellation and registers itself at start-up: saves any text-based file (svg, xml, html, json, csv, markdown) as a `.txt`. The planner chains it after other tools (cgm -> svg -> txt).
+- A tool author can drop a `constellation.json` next to the code to state what the code cannot show: description, tags and the mime type of any port (`{"inputs": {"port": {"mime": "*/*"}}, "outputs": {"port": {"mime": "text/plain"}}}`). Onboarding applies it and will not overwrite it with observed types.
+
+### Tools that cannot be probed safely (C++ engines, installers, big DLL folders)
+Onboarding never starts scripts whose name or content looks like a build/install/download step (build, setup, vcvars, msbuild, winget, pip install, ...). They are listed as "skipped" in the log. If automatic discovery is not enough, describe the node yourself in `constellation.json` with a `command` and nothing is probed:
+```json
+{"command": "{python} server_cli.py --input {model} --output {glb}",
+ "inputs":  {"model": {"mime": "model/step"}},
+ "outputs": {"glb": {"mime": "model/gltf-binary", "path": "{outdir}/out.glb"}},
+ "example_inputs": {"model": "samples/a.step"}}
+```
+
+## Canvas selection and clipboard
+
+- Drag on empty canvas to box-select (Shift/Ctrl adds); Shift/Ctrl-click toggles a node; Ctrl A selects everything.
+- Selected nodes move together; arrow keys nudge (Shift = 10 px). Pan with Space+drag, the hand tool or middle mouse.
+- Ctrl C / Ctrl X / Ctrl V copy, cut and paste nodes with the connections between them (also across pipelines and browser tabs); Ctrl D duplicates.
+- Click a connection to select it; Del removes it (double-click also removes). Del removes the whole selection.

@@ -15,7 +15,8 @@ EXT_MIME = {
     ".xml": "application/xml", ".yaml": "application/yaml", ".yml": "application/yaml",
     ".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ".zip": "application/zip", ".svg": "image/svg+xml",
+    ".zip": "application/zip", ".svg": "image/svg+xml", ".cgm": "image/cgm",
+    ".gif": "image/gif", ".webp": "image/webp",
 }
 MIME_EXT = {}
 for _e, _m in EXT_MIME.items():
@@ -28,6 +29,7 @@ WORD_MIME = {
     "csv": "text/csv", "bom": "text/csv", "json": "application/json",
     "html": "text/html", "listing": "text/html", "page": "text/html", "website": "text/html",
     "pdf": "application/pdf", "png": "image/png", "image": "image/png",
+    "svg": "image/svg+xml", "cgm": "image/cgm", "vector": "image/svg+xml",
 }
 
 
@@ -86,6 +88,7 @@ def compatible(produced: str, accepted: str) -> bool:
     if accepted.endswith("/*"):
         return produced.startswith(accepted[:-1])
     # text/plain accepts structured text, not the other way round
-    if accepted == "text/plain" and produced.startswith(("text/", "application/json")):
+    if accepted == "text/plain" and (produced.startswith(("text/", "application/json", "application/xml", "application/yaml"))
+                                      or produced.endswith("+xml")):
         return True
     return False

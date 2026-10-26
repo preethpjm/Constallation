@@ -1,0 +1,9 @@
+.venv
+__pycache__
+runs
+crawled
+uploaded_tools
+registry/*/app
+registry/*/verify_out
+nodeforge.settings.json
+*.zip

@@ -29,7 +29,16 @@ BUILD_FILES = {"package.json", "requirements.txt", "pyproject.toml", "setup.py",
 SAMPLE_DIR_HINTS = ("example", "sample", "test", "fixture", "demo", "data", "input")
 
 
+LIB_EXT = (".dll", ".sys", ".ocx", ".lib", ".pyd", ".node", ".so", ".dylib", ".a", ".o", ".obj", ".pdb", ".ilk",
+           ".exp", ".manifest", ".mui", ".cat", ".drv")
+
+
 def _is_binary_exec(path):
+    """A program we could start. Libraries (DLL, .so, ...) carry the same headers but must never be launched:
+    on Windows, starting a DLL opens the 'no app associated' dialog."""
+    low = os.path.basename(path).lower()
+    if low.endswith(LIB_EXT) or ".so." in low:
+        return None
     try:
         with open(path, "rb") as f:
             magic = f.read(4)
@@ -38,7 +47,7 @@ def _is_binary_exec(path):
     if magic == b"\x7fELF":
         return "elf"
     if magic[:2] == b"MZ":
-        return "pe"
+        return "pe" if low.endswith(".exe") else None
     if magic in (b"\xcf\xfa\xed\xfe", b"\xfe\xed\xfa\xcf"):
         return "macho"
     return None
@@ -69,7 +78,7 @@ def scan(tool_dir: str) -> dict:
             if ext in SOURCE_EXT:
                 lang = SOURCE_EXT[ext]
                 ev["languages"][lang] = ev["languages"].get(lang, 0) + 1
-                ev["sources"][rel] = _read(p, 20000)
+                ev["sources"][rel] = _read(p, 600000)   # whole file: the CLI entry is often at the bottom
             elif ext == ".jar":
                 ev["binaries"].append({"path": rel, "kind": "jar"})
             else:
@@ -112,6 +121,23 @@ def _with_runtime(lang, target):
     if lang in ("elf",):
         return f"{pre} ./{target.replace(os.sep, '/')}", None
     return f"{pre} {_q(target)}", None
+
+
+RISKY_NAME = re.compile(r"(^|[_\-. ])(build|install|installer|setup|compile|make|uninstall|clean|deploy|bootstrap|vcvars\w*|"
+                        r"configure|restore|update|prereq\w*|dependenc\w*|vs[_-]?\w*|register|package|release)([_\-. ]|$)", re.I)
+RISKY_BODY = re.compile(r"vs_buildtools|vs_installer|vs_community|vswhere|winget|choco(latey)?\b|msbuild|devenv|vcvars|\bcl\.exe|\bnmake\b|"
+                        r"cmake|\bmsiexec|Start-Process|Invoke-WebRequest|\bcurl\b|\bwget\b|pip\s+install|npm\s+i(nstall)?\b|"
+                        r"apt(-get)?\s+install|brew\s+install|rm\s+-rf|\bdel\s+/|\brmdir\b|\bformat\s+[a-z]:|reg\s+(add|delete)|"
+                        r"\bsc\s+(create|delete)|\bsudo\b|\bshutdown\b", re.I)
+
+
+def risky_script(rel, src):
+    """Scripts that build, install or download things are never started just to see what they print."""
+    why = RISKY_NAME.search(os.path.splitext(os.path.basename(rel))[0])
+    if why:
+        return f"its name looks like a {why.group(2).lower()} script"
+    body = RISKY_BODY.search(src or "")
+    return f"it contains '{body.group(0).strip()}'" if body else None
 
 
 def _find_entries(ev, root):
@@ -164,11 +190,15 @@ def _find_entries(ev, root):
             cands.append({"invoke": None, "source": rel, "lang": lang, "score": 2,
                           "needs_build": build, "runtime_problem": problem})
             continue
-        if score > 0:
+        risky = risky_script(rel, src) if lang in ("shell", "batch", "powershell") else None
+        if risky:
+            score -= 10
+        if score > 0 or risky:
             inv, problem = _with_runtime(lang, rel)
             docs = " ".join(ev["docs"].values()) + " ".join(ev["build"].values())
             if os.path.basename(rel) in docs: score += 3
-            cands.append({"invoke": inv, "source": rel, "lang": lang, "score": score, "runtime_problem": problem})
+            cands.append({"invoke": inv, "source": rel, "lang": lang, "score": score, "runtime_problem": problem,
+                          **({"no_probe": f"not started: {risky}"} if risky else {})})
     pkg = ev["build"].get("package.json")
     if pkg:
         try:
@@ -243,8 +273,13 @@ def probe_help(ev: dict, max_cands: int = 3) -> None:
             else:
                 c["runtime_problem"] = (f"build `{c['needs_build']}` produced no {native} executable "
                                         f"(exit {r['code']}): {r['output'][-400:].strip()}")
+        if c.get("no_probe"):
+            ev["help"][f"SKIPPED {c['source']}"] = c["no_probe"]
+            ev.setdefault("probed", []).append(f"skipped {c['source']} ({c['no_probe']})")
+            continue
         if not c.get("invoke") or c.get("runtime_problem"):
             continue
+        ev.setdefault("probed", []).append(f"running {c['invoke']} --help")
         texts = []
         for flag in ("--help", "-h", ""):
             r = sandbox.run(f"{c['invoke']} {flag}".strip(), work, timeout=15)

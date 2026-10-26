@@ -103,10 +103,10 @@ def _run_ai(n, inputs, outdir):
             ctx += f"\n--- {os.path.basename(p)} ---\n" + open(p, errors="replace").read()[:30000]
     try:
         txt = llm.complete("You are a pipeline step. Follow the instruction using the provided files. "
-                           "Output only the result content.", f"INSTRUCTION: {n.get('prompt')}\n\nFILES:{ctx}", 4000)
+                           "Output only the result content.", f"INSTRUCTION: {n.get('prompt')}\n\nFILES:{ctx}", 4000, model=n.get("model") or None)
     except Exception as e:  # noqa
         return {"ok": False, "errors": [str(e)]}
-    ext = {"application/json": ".json", "text/html": ".html", "text/csv": ".csv"}.get(n.get("mime"), ".md")
+    ext = {"application/json": ".json", "text/html": ".html", "text/csv": ".csv", "image/svg+xml": ".svg"}.get(n.get("mime"), ".md")
     p = os.path.join(outdir, "out" + ext)
     open(p, "w").write(txt)
     return {"ok": True, "outputs": {"out": p}}

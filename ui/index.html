@@ -4,476 +4,1026 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Constellation</title>
-<script src="/vendor/marked.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js'"></script>
+<script src="/vendor/marked.min.js"></script>
 <script type="module" src="/vendor/model-viewer.min.js"></script>
 <style>
-:root{--bg:#0f1115;--panel:#161920;--panel2:#1d212a;--line:#2a2f3a;--text:#e6e8ec;--dim:#8b93a3;
---accent:#7c9cff;--dec:#ff8fb1;--ok:#3ecf8e;--bad:#ff6b6b;--warn:#f5b04c;--in:#3aa7a0;--tool:#7c9cff;--out:#c48cff;--ai:#f5b04c}
-*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
-font:13px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
-button,input,select,textarea{font:inherit;color:inherit}
-.app{display:grid;grid-template-columns:290px 1fr 360px;height:100vh}
-aside{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:14px}
-aside.right{border-right:0;border-left:1px solid var(--line)}
-h1{font-size:15px;margin:0 0 2px;letter-spacing:.3px}h2{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);margin:18px 0 8px}
-.sub{color:var(--dim);font-size:12px}
-textarea,input[type=text],select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:8px}
-textarea{resize:vertical;min-height:62px}
-.btn{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:7px 11px;cursor:pointer}
-.btn:hover{border-color:var(--accent)}.btn.primary{background:var(--accent);border-color:var(--accent);color:#0b0e14;font-weight:600}
-.row{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
-.lib{display:flex;flex-direction:column;gap:6px}
-.libitem{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer}
-.libitem:hover{border-color:var(--accent)}.libitem b{font-size:12.5px}
-.libitem .types{color:var(--dim);font-size:11px;margin-top:3px;word-break:break-word}
-.pill{display:inline-block;font-size:10px;padding:1px 6px;border-radius:9px;margin-left:5px;vertical-align:1px}
-.pill.verified{background:#1e3b2e;color:var(--ok)}.pill.failed,.pill.unverified{background:#3b1e22;color:var(--bad)}
-main{position:relative;overflow:hidden;background-color:var(--bg);
-background-image:radial-gradient(#252a35 1px,transparent 1px);background-size:22px 22px}
-.toolbar{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:6px;z-index:5;align-items:center}
-.toolbar .status{margin-left:auto;color:var(--dim);font-size:12px}
-#world{position:absolute;left:0;top:0;width:4000px;height:3000px;transform-origin:0 0}
-main.panning{cursor:grabbing}
-svg#edges{position:absolute;left:0;top:0;width:4000px;height:3000px;pointer-events:none;overflow:visible}
-svg#edges path{stroke:#4d566a;stroke-width:2;fill:none;pointer-events:stroke;cursor:pointer}
-svg#edges path:hover{stroke:var(--bad)}svg#edges path.live{stroke:var(--ok)}
-.node{position:absolute;width:230px;background:var(--panel);border:1px solid var(--line);border-radius:10px;
-box-shadow:0 6px 20px rgba(0,0,0,.35);user-select:none}
-.node.sel{border-color:var(--accent)}.node.done{box-shadow:0 0 0 1px var(--ok),0 6px 20px rgba(0,0,0,.35)}
-.node.failed{box-shadow:0 0 0 1px var(--bad),0 6px 20px rgba(0,0,0,.35)}.node.skipped{opacity:.45}
-details.set{margin-top:18px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--panel2)}
-details.set summary{cursor:pointer;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--dim)}
-.ok{color:var(--ok)}.dec{font-size:11.5px;color:var(--dim);margin-top:4px}.node.running{box-shadow:0 0 0 1px var(--warn)}
-.nh{padding:8px 10px;border-bottom:1px solid var(--line);cursor:grab;display:flex;gap:7px;align-items:center;border-radius:10px 10px 0 0}
-.nh .dot{width:8px;height:8px;border-radius:50%}
-.nh .t{font-weight:600;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.nh .k{margin-left:auto;font-size:10px;color:var(--dim);text-transform:uppercase}
-.nb{padding:6px 0}
-.port{display:flex;align-items:center;gap:6px;padding:3px 10px;font-size:11.5px;position:relative}
-.port.out{justify-content:flex-end}
-.port .c{width:11px;height:11px;border-radius:50%;border:2px solid #5a6478;background:var(--panel);cursor:crosshair;flex:none}
-.port.in .c{margin-left:-16px}.port.out .c{margin-right:-16px}
-.port .c:hover,.port .c.pending{border-color:var(--accent);background:var(--accent)}
-.port .m{color:var(--dim);font-size:10px}
-.nf{padding:6px 10px 9px;border-top:1px solid var(--line)}
-.nf input[type=file]{width:100%;font-size:11px}
-.nf .fname{font-size:11px;color:var(--ok);word-break:break-all}
-.outlink{color:var(--accent);font-size:11.5px;word-break:break-all}
-.insp{font-size:12.5px}.insp .md table{border-collapse:collapse;width:100%;font-size:11.5px}
-.insp .md td,.insp .md th{border:1px solid var(--line);padding:3px 5px;text-align:left}
-.insp .md pre,.log{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:8px;overflow:auto;
-white-space:pre-wrap;font:11.5px/1.4 ui-monospace,Menlo,Consolas,monospace;max-height:320px}
-.insp .md h1{font-size:15px}.insp .md h2{font-size:11px}
-.errs{color:var(--bad);font-size:12px;margin-top:8px;white-space:pre-wrap}
-.preview{width:100%;height:280px;border:1px solid var(--line);border-radius:8px;background:#fff}
-model-viewer{width:100%;height:280px;background:var(--panel2);border-radius:8px}
-label.f{display:block;color:var(--dim);font-size:11px;margin:8px 0 3px}
-.hint{color:var(--dim);font-size:11.5px;margin-top:6px}
+@font-face{font-family:Inter;font-weight:400;src:url(/vendor/inter-latin-400-normal.woff2) format("woff2");font-display:swap}
+@font-face{font-family:Inter;font-weight:500;src:url(/vendor/inter-latin-500-normal.woff2) format("woff2");font-display:swap}
+@font-face{font-family:Inter;font-weight:600;src:url(/vendor/inter-latin-600-normal.woff2) format("woff2");font-display:swap}
+@font-face{font-family:"JetBrains Mono";font-weight:400;src:url(/vendor/jetbrains-mono-latin-400-normal.woff2) format("woff2");font-display:swap}
 
-/* ---- refinements (v2) */
-:root{--r:10px;--shadow:0 10px 30px rgba(0,0,0,.35)}
-::selection{background:#7c9cff55}
-::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#2a2f3a;border-radius:9px;border:2px solid var(--panel)}
-.app{grid-template-columns:316px 1fr 380px}
-aside{padding:0;display:flex;flex-direction:column}
-.brand{display:flex;gap:11px;align-items:center;padding:16px 16px 12px}
-.logo{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:17px;color:#0b0e14;
-  background:linear-gradient(135deg,#9db4ff,#7c9cff 55%,#c48cff)}
-.brand h1{margin:0;font-size:15px;letter-spacing:.2px}.brand .sub{font-size:11.5px}
-.icon{margin-left:auto;background:none;border:1px solid var(--line);border-radius:8px;width:30px;height:30px;cursor:pointer;color:var(--dim)}
-.icon:hover{color:var(--text);border-color:var(--accent)}
-.tabs{display:flex;gap:2px;margin:0 14px;padding:3px;background:var(--bg);border:1px solid var(--line);border-radius:9px}
-.tabs button{flex:1;background:none;border:0;border-radius:7px;padding:6px 4px;cursor:pointer;color:var(--dim);font-size:12px}
-.tabs button.on{background:var(--panel2);color:var(--text);box-shadow:0 1px 0 #ffffff0d inset}
-.tabs i{font-style:normal;font-size:10px;background:#ffffff12;border-radius:8px;padding:0 6px;margin-left:3px}
-.pane{display:none;padding:4px 14px 18px;overflow:auto;flex:1}.pane.on{display:block}
-h2{margin:18px 0 8px}
-.card{background:var(--panel2);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-top:10px}
-.card h3{margin:0 0 2px;font-size:12.5px}.card .hint{margin:0 0 8px}
-.card .row{margin-top:8px}
-.btn{border-radius:8px;transition:border-color .15s,background .15s,transform .05s}.btn:active{transform:translateY(1px)}
-a.btn{color:var(--text);display:inline-block}.btn.ghost{background:none}.btn.sm{padding:4px 9px;font-size:11.5px}.btn[disabled]{opacity:.5;cursor:wait}
+/* ---------- tokens: neutral charcoal, indigo accent, one colour per node kind ---------- */
+:root{
+  --bg:#111113;--rail:#0e0e10;--panel:#17181b;--canvas:#1a1b1f;--card:#222329;--card2:#2a2b32;
+  --line:#2c2e36;--line2:#3a3d48;--text:#e8e9ee;--dim:#9a9eab;--dim2:#6a6e7b;
+  --accent:#6b70f2;--accent2:#8b90ff;--blue:#2f6bff;
+  --ok:#3ddc97;--bad:#ff6b81;--warn:#fbbf24;
+  --in:#5eead4;--tool:#8b90ff;--ai:#c4a1ff;--dec:#fb923c;--out:#60a5fa;
+  --ease:cubic-bezier(.2,.8,.2,1);--r:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);overflow:hidden;
+  font:13px/1.45 Inter,ui-sans-serif,system-ui,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;letter-spacing:-.003em}
+button,input,select,textarea{font:inherit;color:inherit}
+code,pre,.mono{font-family:"JetBrains Mono",ui-monospace,Consolas,monospace}
+svg.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
+svg.i rect,svg.i circle{fill:currentColor;fill-opacity:.13}
+span[data-i]{display:inline-flex;align-items:center;justify-content:center;line-height:0}
+svg.i.fill{fill:currentColor;stroke:none}
+::selection{background:#6b70f255}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#2c2e36;border-radius:9px;border:3px solid transparent;background-clip:content-box}
+
+.app{display:grid;grid-template-columns:56px var(--pw,330px) 1fr;height:100vh;transition:grid-template-columns .25s var(--ease)}
+.app.nopanel{--pw:0px}
+
+/* ---------- rail ---------- */
+.rail{background:var(--rail);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:6px;z-index:20}
+.logo{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;margin-bottom:10px;
+  background:radial-gradient(circle at 30% 25%,#9aa0ff,#6b70f2 55%,#4a3fd0);box-shadow:0 8px 22px -10px #6b70f2}
+.logo svg{width:19px;height:19px;stroke:#fff;stroke-width:1.9}
+.logo svg circle{fill:#fff;fill-opacity:.9}
+.rb{width:38px;height:38px;border-radius:11px;border:0;background:none;color:var(--dim2);display:grid;place-items:center;cursor:pointer;position:relative;transition:all .18s var(--ease)}
+.rb:hover{background:#ffffff0c;color:var(--text)}
+.rb svg.i{width:21px;height:21px;stroke-width:1.6}
+.rb.on{background:#6b70f21f;color:var(--accent2)}
+.rb.on::before{content:"";position:absolute;left:-9px;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:var(--accent)}
+.rb .badge{position:absolute;top:3px;right:2px;font-size:9px;font-weight:400;background:var(--card2);border:1px solid var(--line2);border-radius:8px;padding:0 4px;color:var(--dim)}
+.rail .sp{flex:1}
+.tip{position:absolute;left:46px;background:#000;border:1px solid var(--line2);border-radius:7px;padding:3px 8px;font-size:11px;white-space:nowrap;opacity:0;pointer-events:none;transform:translateX(-4px);transition:all .15s;z-index:50}
+.rb:hover .tip{opacity:1;transform:none}
+
+/* ---------- side panel ---------- */
+.panel{background:var(--panel);border-right:1px solid var(--line);overflow:hidden;min-width:0}
+.pin{width:330px;height:100%;display:flex;flex-direction:column}
+.ph{padding:16px 16px 10px}
+.ph h1{margin:0;font-size:15px;font-weight:600;letter-spacing:-.02em}.ph .sub{color:var(--dim2);font-size:11.5px;margin-top:1px}
+.pane{display:none;flex:1;overflow:auto;padding:4px 16px 20px}.pane.on{display:block;animation:fade .25s var(--ease)}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+h2{margin:18px 0 8px;font-size:10.5px;font-weight:500;color:var(--dim2);text-transform:uppercase;letter-spacing:.12em;display:flex;align-items:center;gap:8px}
+h2 .count{margin-left:auto;font:10px "JetBrains Mono",monospace;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:0 7px;color:var(--dim)}
+.sub{color:var(--dim2);font-size:12px}
+.hint{color:var(--dim2);font-size:11.5px;margin-top:6px}
+textarea,input[type=text],select{width:100%;background:#131417;border:1px solid var(--line);border-radius:10px;padding:9px 11px;transition:border-color .15s,box-shadow .15s}
+textarea{resize:vertical;min-height:74px;line-height:1.5}
+textarea:focus,input[type=text]:focus,select:focus{outline:0;border-color:var(--accent);box-shadow:0 0 0 3px #6b70f226}
+::placeholder{color:var(--dim2)}
+.btn{display:inline-flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line);border-radius:9px;padding:7px 12px;cursor:pointer;font-weight:500;transition:all .16s var(--ease);text-decoration:none;color:var(--text)}
+.btn:hover{border-color:var(--line2);background:var(--card2)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 8px 22px -10px var(--accent)}
+.btn.primary:hover{background:#7a7ff5}
+.btn.ghost{background:none}.btn.sm{padding:4px 9px;font-size:11.5px;border-radius:8px}.btn[disabled]{opacity:.5;cursor:wait}
+.row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
-.chip{border:1px solid var(--line);background:none;border-radius:20px;padding:3px 10px;font-size:11.5px;color:var(--dim);cursor:pointer}
-.chip.on{background:#7c9cff22;border-color:var(--accent);color:var(--text)}
-.libitem{display:grid;grid-template-columns:8px 1fr auto;gap:2px 10px;align-items:center;padding:9px 11px}
-.sdot{width:8px;height:8px;border-radius:50%;background:var(--ok);grid-row:1/3}.sdot.failed,.sdot.unverified{background:var(--bad)}
-.libitem .nm{font-weight:600;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.libitem .types{grid-column:2/4;margin:0}
-.tag{font-size:10px;border:1px solid var(--line);border-radius:6px;padding:0 5px;color:var(--dim);margin-left:6px;font-weight:400}
-.tag.wrap{color:#c48cff;border-color:#c48cff55}
-.empty{border:1px dashed var(--line);border-radius:var(--r);padding:18px;text-align:center;color:var(--dim)}
-.palette{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.palette .btn{text-align:left;display:flex;gap:7px;align-items:center}
-.palette .dot{width:8px;height:8px;border-radius:50%}
-.toolbar{padding:6px;background:#161920cc;backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
-.toolbar .status{padding-right:6px}
-.seg{display:flex;gap:6px}
-.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:12px}.kv span:nth-child(odd){color:var(--dim)}
-.res{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:8px}
-.res td,.res th{border-bottom:1px solid var(--line);padding:5px 4px;text-align:left;vertical-align:top}
-.badge{font-size:10px;border-radius:6px;padding:1px 6px;font-weight:600}
-.badge.onboard,.badge.wrap{background:#1e3b2e;color:var(--ok)}.badge.skip{background:#3b2f1e;color:var(--warn)}
-.fnrow{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
-.fnrow:last-child{border:0}.fnrow b{font-size:12px}.fnrow .m{color:var(--dim);font-size:11px}
-.fnrow .go{margin-left:auto}
-dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:18px;width:min(460px,92vw);box-shadow:var(--shadow)}
-dialog::backdrop{background:#000a;backdrop-filter:blur(2px)}
-dialog h3{margin:0 0 4px}
-.itabs{display:flex;gap:2px;margin:10px 0;border-bottom:1px solid var(--line)}
-.itabs button{background:none;border:0;border-bottom:2px solid transparent;padding:6px 10px;cursor:pointer;color:var(--dim);font-size:12px}
-.itabs button.on{color:var(--text);border-color:var(--accent)}
-.log.tall{max-height:420px}
-aside.right{padding:14px}
-@media (max-width:900px){.app{grid-template-columns:1fr;grid-template-rows:auto 70vh auto}aside{border:0}}
+.chip{border:1px solid var(--line);background:none;border-radius:20px;padding:3px 11px;font-size:11.5px;color:var(--dim);cursor:pointer;transition:all .16s}
+.chip:hover{border-color:var(--line2);color:var(--text)}.chip.on{background:#6b70f21f;border-color:#6b70f288;color:var(--text)}
+.search{position:relative}.search>span{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--dim2);display:flex}
+.search input{padding-left:34px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px;margin-top:10px}
+.card h3{margin:0 0 2px;font-size:12.5px;font-weight:600}.card .hint{margin:0 0 8px}
+
+/* library: template cards */
+.lib{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:9px}
+.tpl{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 10px 10px;text-align:center;cursor:grab;position:relative;transition:all .2s var(--ease)}
+.tpl:hover{border-color:#6b70f288;transform:translateY(-2px);background:var(--card2)}
+.tpl:active{cursor:grabbing}
+.tile{width:52px;height:52px;border-radius:15px;margin:2px auto 9px;display:grid;place-items:center;color:var(--tc);
+  background:color-mix(in srgb,var(--tc) 14%,#16171a);border:1px solid color-mix(in srgb,var(--tc) 26%,transparent)}
+.tile svg{width:26px;height:26px;stroke-width:1.6}
+.tpl .nm{font-size:11.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tpl .why{font-size:9.5px;color:var(--accent2);margin-top:3px;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.tpl .io{font:10px "JetBrains Mono",monospace;color:var(--dim2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile svg.i rect,.tile svg.i circle{fill-opacity:.18}
+.tpl .st{position:absolute;top:9px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.tpl .st.failed,.tpl .st.unverified{background:var(--bad);box-shadow:0 0 8px var(--bad)}
+.tpl .wr{position:absolute;top:7px;left:8px;font-size:8.5px;letter-spacing:.06em;color:var(--ai);border:1px solid #c4a1ff44;border-radius:5px;padding:0 4px}
+.empty{border:1px dashed var(--line2);border-radius:var(--r);padding:20px;text-align:center;color:var(--dim);grid-column:1/-1}
+.palette{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.pal{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 11px;cursor:pointer;transition:all .16s var(--ease);text-align:left}
+.pal:hover{border-color:var(--line2);transform:translateY(-1px)}
+.pal .ic{width:30px;height:30px;border-radius:9px;display:flex!important;align-items:center;justify-content:center;flex:none;color:var(--kc);background:color-mix(in srgb,var(--kc) 14%,transparent)}
+.pal .ic svg.i{width:17px;height:17px}
+.pal b{font-weight:500;font-size:12px;display:block}.pal span.s{font-size:10.5px;color:var(--dim2)}
+.fnrow{display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}.fnrow:last-child{border:0}
+.fnrow b{font-size:12px}.fnrow .m{color:var(--dim2);font-size:11px}.fnrow .go{margin-left:auto}
+.res{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:8px}.res td{border-bottom:1px solid var(--line);padding:6px 4px;vertical-align:top}
+.badge2{font-size:10px;border-radius:6px;padding:1px 6px;font-weight:600;background:#12301f;color:var(--ok)}.badge2.skip{background:#3a2d12;color:var(--warn)}
+
+/* ---------- canvas ---------- */
+main{position:relative;overflow:hidden;background:var(--canvas);background-image:radial-gradient(#ffffff17 1px,transparent 1.2px);background-size:22px 22px;cursor:default}
+#marq{position:absolute;display:none;border:1px solid var(--accent);background:#6b70f21c;border-radius:4px;pointer-events:none;z-index:7}
+main.hand,main.panning{cursor:grab}main.panning{cursor:grabbing}
+#world{position:absolute;left:0;top:0;width:6000px;height:4000px;transform-origin:0 0}
+svg#edges{position:absolute;left:0;top:0;width:6000px;height:4000px;pointer-events:none;overflow:visible}
+svg#edges path{pointer-events:stroke}
+svg#edges .pipe{fill:none;stroke:#5a5e6e;stroke-width:1.8;stroke-linecap:round;cursor:pointer;transition:stroke .2s,stroke-width .2s}
+svg#edges .pipe:hover{stroke:var(--ec);stroke-width:2.8}
+svg#edges .pipe.hl,svg#edges .pipe.live{stroke:var(--ec)}
+svg#edges .pipe.esel{stroke:var(--accent);stroke-width:3.2;filter:drop-shadow(0 0 5px #6b70f2aa)}
+svg#edges .pipe.flow{stroke:var(--ec);stroke-dasharray:6 8;animation:dash .6s linear infinite}
+svg#edges .tmp{fill:none;stroke:var(--accent2);stroke-width:2;stroke-dasharray:5 6;pointer-events:none}
+svg#edges .pk{filter:drop-shadow(0 0 4px var(--ec))}
+@keyframes dash{to{stroke-dashoffset:-14}}
+
+/* top bar */
+.top{position:absolute;left:16px;right:16px;top:12px;display:flex;align-items:center;gap:10px;z-index:8;pointer-events:none}
+.top>*{pointer-events:auto}
+.crumb{display:flex;align-items:center;gap:8px;background:#1f2025e6;border:1px solid var(--line);border-radius:11px;padding:5px 10px 5px 12px;backdrop-filter:blur(10px)}
+.crumb .a{color:var(--dim2)}.crumb input{background:none;border:0;padding:2px 4px;width:190px;font-weight:500;border-radius:6px}.crumb input:focus{background:#ffffff0c;box-shadow:none}
+.draft{font-size:10.5px;font-weight:500;color:#f6b26b;background:#f6b26b1c;border:1px solid #f6b26b44;border-radius:6px;padding:1px 8px}
+.draft.ran{color:var(--ok);background:#3ddc9718;border-color:#3ddc9744}.draft.fail{color:var(--bad);background:#ff6b8118;border-color:#ff6b8144}
+.top .grow{flex:1}
+.pillbtn{display:flex;align-items:center;gap:7px;background:#1f2025e6;border:1px solid var(--line);border-radius:10px;padding:6px 11px;cursor:pointer;color:var(--dim);font-size:12px;backdrop-filter:blur(10px);transition:all .16s}
+.pillbtn svg.i{width:17px;height:17px}
+.pillbtn:hover{color:var(--text);border-color:var(--line2)}
+.llm i{width:7px;height:7px;border-radius:50%;background:var(--dim2)}.llm.on i{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.menu{position:absolute;right:0;top:40px;background:#1c1d22;border:1px solid var(--line2);border-radius:12px;padding:5px;min-width:210px;box-shadow:0 24px 60px -16px #000;display:none;z-index:30}
+.menu.open{display:block;animation:fade .18s var(--ease)}
+.menu button{display:flex;width:100%;align-items:center;gap:10px;background:none;border:0;border-radius:8px;padding:8px 10px;cursor:pointer;text-align:left;color:var(--text)}
+.menu button:hover{background:#ffffff0d}.menu hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+
+/* nodes */
+.node{position:absolute;width:262px;background:var(--card);border:1px solid var(--line2);border-radius:14px;box-shadow:0 12px 30px -16px #000;
+  transition:border-color .18s,box-shadow .18s,background .18s;user-select:none}
+.node:hover{border-color:#4b4f5d}
+.node.new{animation:pop .4s var(--ease) both}
+@keyframes popc{from{opacity:0;transform:translateX(-50%) translateY(8px) scale(.97)}to{opacity:1;transform:translateX(-50%)}}
+@keyframes pop{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:none}}
+.node.sel{background:linear-gradient(180deg,#31327a66,#25265c40),var(--card);border-color:var(--accent);box-shadow:0 0 0 1px #6b70f255,0 16px 40px -16px #6b70f288}
+.node.running{border-color:var(--warn);animation:breathe 1.4s ease-in-out infinite}
+@keyframes breathe{50%{box-shadow:0 0 0 1px #fbbf2466,0 0 34px -6px #fbbf2455}}
+.node.done{border-color:#3ddc9777}.node.failed{border-color:#ff6b8199}.node.skipped{opacity:.5}
+.nhead{display:flex;align-items:center;gap:8px;padding:10px 12px 0;cursor:grab}
+.nhead .ico{width:20px;height:20px;border-radius:6px;display:grid;place-items:center;color:var(--kc);background:color-mix(in srgb,var(--kc) 16%,transparent)}
+.nhead .ico svg{width:12px;height:12px;stroke-width:2}
+.nhead .kind{font-size:9.5px;font-weight:600;letter-spacing:.12em;color:var(--dim2);text-transform:uppercase}
+.nhead .stat{margin-left:auto;display:flex;align-items:center;gap:5px;font-size:10px;color:var(--dim2)}
+.nhead .stat.done{color:var(--ok)}.nhead .stat.failed{color:var(--bad)}.nhead .stat.running{color:var(--warn)}
+.spin{width:9px;height:9px;border:1.5px solid currentColor;border-right-color:transparent;border-radius:50%;animation:rot .7s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.ntitle{padding:5px 12px 0;font-weight:600;font-size:13.5px;letter-spacing:-.015em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nsub{padding:1px 12px 0;color:var(--dim);font-size:11.5px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ports{display:grid;grid-template-columns:1fr 1fr;gap:0 10px;padding:10px 0 4px}
+.pcol{display:flex;flex-direction:column;gap:5px;min-width:0}.pcol.out{align-items:flex-end;grid-column:2}
+.pr{position:relative;display:flex;align-items:center;gap:6px;height:24px;padding:0 12px;background:#00000026;font-size:11px;max-width:100%}
+.pcol.in .pr{border-radius:0 8px 8px 0}.pcol.out .pr{border-radius:8px 0 0 8px;flex-direction:row-reverse}
+.pr .pn{font-family:"JetBrains Mono",monospace;font-size:10.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#cfd2dc}
+.pr .pt{font-size:9px;letter-spacing:.04em;color:var(--pc);background:color-mix(in srgb,var(--pc) 14%,transparent);border-radius:5px;padding:0 5px}
+.pr .c{position:absolute;top:50%;width:13px;height:13px;margin-top:-6.5px;border-radius:50%;background:var(--card);border:2px solid var(--pc);cursor:crosshair;transition:transform .14s var(--ease),background .14s}
+.pcol.in .pr .c{left:-7px}.pcol.out .pr .c{right:-7px}
+.pr .c::after{content:"";position:absolute;inset:-7px}
+.pr .c:hover,.pr .c.pending{background:var(--pc);transform:scale(1.3)}
+body.connecting .pr .c.ok{background:var(--pc);transform:scale(1.35);box-shadow:0 0 0 4px color-mix(in srgb,var(--pc) 28%,transparent)}
+body.connecting .pr .c.no{opacity:.25}
+.nfoot{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 12px 11px}
+.fchip{display:inline-flex;align-items:center;gap:5px;background:#00000030;border:1px solid var(--line);border-radius:7px;padding:2px 8px;font-size:10.5px;color:var(--dim)}
+.fchip.ok{color:var(--ok);border-color:#3ddc9744}.fchip.bad{color:var(--bad);border-color:#ff6b8144;white-space:pre-wrap;max-width:100%}
+.dz{display:flex;align-items:center;gap:8px;width:100%;border:1px dashed var(--line2);border-radius:10px;padding:8px 10px;cursor:pointer;color:var(--dim);font-size:11.5px;transition:all .16s;overflow:hidden}
+.dz span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dz:hover,.dz.over{border-color:var(--accent);color:var(--text);background:#6b70f212}
+.dz.has{border-style:solid;border-color:#3ddc9755;color:var(--ok)}
+.dz input{display:none}
+.outlink{color:var(--accent2);font-size:11.5px;word-break:break-all;text-decoration:none}
+.ntb{position:absolute;left:50%;top:-46px;transform:translateX(-50%);display:none;gap:2px;background:#1c1d22;border:1px solid var(--line2);border-radius:11px;padding:4px;box-shadow:0 14px 34px -12px #000;z-index:5}
+#world.multi .node.sel .ntb{display:none!important}
+.node.sel .ntb{display:flex;animation:popc .22s var(--ease) both}
+.ntb button{width:28px;height:28px;border:0;border-radius:8px;background:none;color:var(--dim);cursor:pointer;display:grid;place-items:center}
+.ntb button:hover{background:#ffffff10;color:var(--text)}.ntb button.del:hover{color:var(--bad)}
+
+/* empty state */
+#empty{position:absolute;inset:0;display:grid;place-items:center;z-index:2;pointer-events:none}
+#empty .box{pointer-events:auto;text-align:center;max-width:540px;padding:30px;animation:pop .6s var(--ease) both}
+#empty .orb{width:54px;height:54px;border-radius:17px;margin:0 auto 16px;display:grid;place-items:center;background:radial-gradient(circle at 30% 25%,#9aa0ff,#6b70f2 55%,#4a3fd0);box-shadow:0 18px 40px -14px #6b70f2}
+#empty .orb svg{width:26px;height:26px;stroke:#fff;stroke-width:1.8}
+#empty h3{font-size:24px;margin:0 0 6px;font-weight:600;letter-spacing:-.03em}
+#empty p{color:var(--dim);margin:0 0 16px}
+#empty .chips{justify-content:center}
+#empty .chip{background:#ffffff08;padding:5px 13px;font-size:12px}
+.kbd{font:10px "JetBrains Mono",monospace;border:1px solid var(--line2);border-radius:5px;padding:1px 5px;color:var(--dim);background:#00000030}
+
+/* dock, minimap, status bar */
+.dock{position:absolute;left:50%;bottom:92px;transform:translateX(-50%);display:flex;align-items:center;gap:2px;background:#1d1e23f2;border:1px solid var(--line2);border-radius:14px;padding:5px;box-shadow:0 20px 50px -16px #000;z-index:9;backdrop-filter:blur(10px)}
+.dock button{display:flex;align-items:center;justify-content:center;gap:7px;background:none;border:0;border-radius:9px;height:32px;width:34px;padding:0;color:var(--dim);cursor:pointer;font-weight:500;transition:all .15s}
+.dock button:hover{background:#ffffff0f;color:var(--text)}.dock button.on{background:#6b70f226;color:var(--accent2)}
+.dock button.ai{background:var(--accent);color:#fff}.dock button.ai:hover{background:#7a7ff5}
+.dock .vr{width:1px;height:20px;background:var(--line);margin:0 4px}
+.dock button[disabled]{opacity:.35;cursor:default}
+.hintbar{position:absolute;left:50%;bottom:50px;transform:translateX(-50%);display:flex;align-items:center;gap:9px;background:none;border:0;color:var(--dim2);font-size:12px;cursor:pointer;z-index:9;padding:5px 12px;border-radius:20px;transition:color .15s,background .15s;white-space:nowrap}
+.hintbar:hover{color:var(--text);background:#ffffff0a}
+.mm.hide{display:none}
+.mm{position:absolute;right:16px;bottom:48px;z-index:9;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+#mmbox{width:188px;height:118px;background:#1d1e23f2;border:1px solid var(--line2);border-radius:12px;overflow:hidden;position:relative;cursor:pointer;box-shadow:0 20px 50px -16px #000}
+#mmbox svg{width:100%;height:100%;display:block}
+.zoom{display:flex;align-items:center;gap:1px;background:#1d1e23f2;border:1px solid var(--line2);border-radius:11px;padding:3px}
+.zoom button{background:none;border:0;width:28px;height:26px;border-radius:7px;cursor:pointer;color:var(--dim);display:grid;place-items:center}.zoom button:hover{background:#ffffff10;color:var(--text)}
+.zoom span.p{font:11px "JetBrains Mono",monospace;color:var(--dim);min-width:42px;text-align:center}
+.status{position:absolute;left:0;right:0;bottom:0;height:32px;display:flex;align-items:center;gap:14px;padding:0 14px;background:#141518f2;border-top:1px solid var(--line);color:var(--dim2);font-size:11.5px;z-index:9}
+.status button{background:none;border:0;display:flex;align-items:center;gap:6px;color:var(--dim);cursor:pointer;padding:3px 6px;border-radius:6px}.status button:hover{background:#ffffff0c;color:var(--text)}
+.status .mid{flex:1;text-align:center}
+.status .dot{width:6px;height:6px;border-radius:50%;background:var(--ok);display:inline-block;margin-right:6px}
+#prog{position:absolute;left:0;right:0;top:0;height:2px;overflow:hidden;opacity:0;transition:opacity .2s;z-index:12}
+#prog.on{opacity:1}#prog i{display:block;height:100%;width:35%;background:linear-gradient(90deg,transparent,var(--accent2),transparent);animation:slide 1.1s linear infinite}
+@keyframes slide{from{transform:translateX(-100%)}to{transform:translateX(300%)}}
+#runlog{position:absolute;left:16px;right:16px;bottom:44px;max-height:42%;background:#17181cf7;border:1px solid var(--line2);border-radius:14px;box-shadow:0 24px 60px -16px #000;z-index:10;display:none;flex-direction:column;overflow:hidden}
+#runlog.open{display:flex;animation:fade .2s var(--ease)}
+#runlog header{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);font-weight:500}
+#runlog .body{overflow:auto;padding:6px 14px 12px;font:11.5px/1.5 "JetBrains Mono",monospace;white-space:pre-wrap}
+#runlog .ln{padding:5px 0;border-bottom:1px solid #ffffff0a}#runlog .ln b{font-family:Inter}
+.ok{color:var(--ok)}.bad,.errs{color:var(--bad)}.errs{font-size:12px;margin-top:8px;white-space:pre-wrap}
+
+/* quick add */
+#qa{position:absolute;left:50%;top:18%;transform:translateX(-50%);width:580px;max-width:calc(100% - 32px);background:#1c1d22;border:1px solid var(--line2);border-radius:14px;box-shadow:0 30px 70px -18px #000;z-index:20;display:none;overflow:hidden}
+#qa.open{display:block;animation:popc .2s var(--ease) both}
+#qa input{border:0;border-bottom:1px solid var(--line);border-radius:0;background:none;padding:15px 16px;font-size:14.5px}
+#qa input:focus{box-shadow:none}
+#qa .list{max-height:360px;overflow:auto;padding:5px}
+#qa .it{display:flex;align-items:center;gap:10px;padding:7px 9px;border-radius:9px;cursor:pointer}
+#qa .it:hover,#qa .it.act{background:#6b70f21f}
+#qa .it .ic{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex:none;color:var(--kc);background:color-mix(in srgb,var(--kc) 14%,transparent)}
+#qa .gh{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--dim2);padding:8px 10px 3px}
+#qa .it.build{border:1px solid #6b70f244;background:#6b70f214}
+#qa .it small{margin-left:auto;color:var(--dim2);font:10px "JetBrains Mono",monospace}
+
+#qa .it .nm{flex:none;max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#qa .it small{flex:1;min-width:0;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srow{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);font:11px "JetBrains Mono",monospace;color:var(--dim)}
+.srow span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.srow button{background:none;border:0;color:var(--dim2);cursor:pointer}.srow button:hover{color:var(--bad)}
+/* previews + inline controls */
+.pv{margin:8px 12px 0;border-radius:10px;overflow:hidden;background:#101114;border:1px solid var(--line);height:138px;position:relative;display:grid;place-items:center}
+.pv>*{max-width:100%}.pv img{width:100%;height:100%;object-fit:contain;background:repeating-conic-gradient(#16171a 0 25%,#1b1c20 0 50%) 0 0/16px 16px}
+.pv model-viewer{width:100%;height:100%;background:radial-gradient(circle at 50% 35%,#23242b,#0f1013);border-radius:0}
+.pv iframe{width:200%;height:200%;border:0;background:#fff;transform:scale(.5);transform-origin:0 0;position:absolute;left:0;top:0;pointer-events:none}
+.pv .tbl{width:100%;height:100%;overflow:auto;font:10px/1.35 "JetBrains Mono",monospace;color:#c8cbd6;padding:6px 8px;white-space:pre}
+.pv table{border-collapse:collapse;width:100%}.pv td,.pv th{border-bottom:1px solid #ffffff10;padding:2px 6px;text-align:left;white-space:nowrap}.pv th{color:var(--accent2);font-weight:500}
+.pv .info{display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--dim)}
+.pv .info b{font:600 11px "JetBrains Mono",monospace;letter-spacing:.08em;background:#ffffff0d;border:1px solid var(--line2);border-radius:7px;padding:2px 8px;color:var(--text)}
+.pv .info span{font-size:10.5px}
+.pv .tag{position:absolute;left:6px;top:6px;font:9px "JetBrains Mono",monospace;background:#000a;border-radius:5px;padding:1px 6px;color:var(--dim);z-index:2;pointer-events:none}
+.pw{display:flex;flex-direction:column;gap:7px;padding:10px 12px 2px}
+.pw .w{display:flex;align-items:center;gap:8px;min-height:26px}
+.pw .w>label{flex:0 0 74px;font-size:10.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pw .w>.c{flex:1;display:flex;gap:6px;align-items:center;min-width:0}
+.pw input[type=text],.pw input[type=number],.pw select,.pw textarea{padding:4px 8px;border-radius:7px;font-size:11.5px;min-height:26px;background:#101114}
+.pw textarea{min-height:56px;resize:vertical}
+.pw .c>input[type=text],.pw .c>input[type=number],.pw .c>select{min-width:0;width:100%;flex:1}
+.pw input[type=color]{-webkit-appearance:none;appearance:none;width:28px;height:26px;border:1px solid var(--line2);border-radius:8px;padding:0;background:none;cursor:pointer;flex:none}
+.pw input[type=color]::-webkit-color-swatch-wrapper{padding:2px}.pw input[type=color]::-webkit-color-swatch{border:0;border-radius:5px}
+.pw input[type=range]{flex:1;accent-color:var(--accent);min-width:0}.pw .rv{font:10.5px "JetBrains Mono",monospace;color:var(--dim);min-width:34px;text-align:right}
+.pw .tg{position:relative;width:34px;height:20px;border-radius:12px;background:#2c2e36;border:0;cursor:pointer;flex:none;transition:background .15s}
+.pw .tg::after{content:"";position:absolute;left:3px;top:3px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .18s var(--ease)}
+.pw .tg.on{background:var(--accent)}.pw .tg.on::after{transform:translateX(14px)}
+.pw .stack{flex-direction:column;align-items:stretch;gap:4px}.pw .stack>label{flex:none}
+.ptag{font-size:9px;color:var(--ai);border:1px solid #c4a1ff44;border-radius:5px;padding:0 5px;margin-left:6px}
+.kmain{display:flex;gap:6px;align-items:center;padding:7px 14px;color:var(--dim2);font-size:11px;border-top:1px solid var(--line)}
+/* inspector */
+#insp{position:absolute;right:14px;top:62px;width:372px;max-height:calc(100% - 200px);overflow:auto;background:#1a1b20f5;border:1px solid var(--line2);border-radius:16px;padding:14px 16px 18px;box-shadow:0 30px 80px -20px #000;z-index:11;display:none;backdrop-filter:blur(14px);font-size:12.5px}
+#insp.open{display:block;animation:fade .22s var(--ease)}
+#insp .x{position:absolute;right:10px;top:10px;background:none;border:0;color:var(--dim);cursor:pointer;width:26px;height:26px;border-radius:7px;display:grid;place-items:center}#insp .x:hover{background:#ffffff10;color:var(--text)}
+#insp h2:first-of-type{margin-top:0}
+label.f{display:block;color:var(--dim);font-size:11px;margin:10px 0 4px}
+.itabs{display:flex;gap:2px;margin:12px 0;border-bottom:1px solid var(--line)}
+.itabs button{background:none;border:0;border-bottom:2px solid transparent;padding:6px 10px;cursor:pointer;color:var(--dim);font-size:12px}.itabs button.on{color:var(--text);border-color:var(--accent)}
+.md table{border-collapse:collapse;width:100%;font-size:11.5px}.md td,.md th{border:1px solid var(--line);padding:4px 6px;text-align:left}
+.md pre,.log,pre.log{background:#121316;border:1px solid var(--line);border-radius:9px;padding:9px;overflow:auto;white-space:pre-wrap;font:11px/1.45 "JetBrains Mono",monospace;max-height:320px}
+.md h1{font-size:15px}.md h2{font-size:11px}.log.tall{max-height:420px}
+.preview{width:100%;height:260px;border:1px solid var(--line);border-radius:10px;background:#fff}
+model-viewer{width:100%;height:260px;background:#121316;border-radius:10px}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line2);border-radius:18px;padding:20px;width:min(480px,92vw);box-shadow:0 40px 90px -20px #000}
+dialog::backdrop{background:#000a;backdrop-filter:blur(3px)}dialog h3{margin:0 0 4px;font-size:16px}
+#toasts{position:fixed;right:16px;top:14px;display:flex;flex-direction:column;gap:8px;z-index:100}
+.toast{background:#1e1f25f2;border:1px solid var(--line2);border-left:3px solid var(--accent);border-radius:11px;padding:10px 14px;font-size:12.5px;max-width:340px;box-shadow:0 18px 44px -14px #000;animation:pop .3s var(--ease) both}
+.toast.ok{border-left-color:var(--ok)}.toast.bad{border-left-color:var(--bad)}
+.drop main{outline:2px dashed var(--accent);outline-offset:-10px}
+.dec{font-size:11.5px;color:var(--dim);margin-top:4px}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+@media (max-width:980px){.app{grid-template-columns:56px 0 1fr}#mmbox{display:none}}
 </style>
 </head>
 <body>
-<div class="app">
-<aside>
-  <div class="brand"><div class="logo">✦</div><div><h1>Constellation</h1><div class="sub">Tools → verified nodes → pipelines</div></div>
-    <button class="icon" id="gear" title="AI settings">⚙</button></div>
-  <nav class="tabs" id="tabs">
-    <button data-tab="build" class="on">Build</button><button data-tab="lib">Library<i id="libCount">0</i></button><button data-tab="add">Add tools</button>
-  </nav>
+<div class="app" id="app">
 
-  <section class="pane on" data-pane="build">
-    <h2>Describe what you need</h2>
+<nav class="rail">
+  <div class="logo" title="Constellation"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="7" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M7.7 8.2l3 7.8M16.5 7.6l-3.4 8.6M8 7l8-1"/></svg></div>
+  <button class="rb on" data-tab="build"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M18.5 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg><span class="tip">Build</span></button>
+  <button class="rb" data-tab="lib"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg><b class="badge" id="libCount">0</b><span class="tip">Node library</span></button>
+  <button class="rb" data-tab="add"><svg class="i" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg><span class="tip">Add tools</span></button>
+  <div class="sp"></div>
+  <button class="rb" id="gear"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg><span class="tip">AI settings</span></button>
+</nav>
+
+<section class="panel"><div class="pin">
+  <div class="ph"><h1 id="ptitle">Build</h1><div class="sub" id="psub">Describe an outcome. Constellation picks verified tools.</div></div>
+
+  <div class="pane on" data-pane="build">
     <textarea id="ask" placeholder="e.g. 3d bom affiliate listing">3d bom affiliate listing</textarea>
-    <div class="row"><button class="btn primary" id="planBtn">Build pipeline</button></div>
+    <div class="row"><button class="btn primary" id="planBtn"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>Build pipeline</button><span class="kbd">Ctrl ↵</span></div>
     <div id="planNote" class="hint"></div>
     <h2>Add to canvas</h2>
     <div class="palette">
-      <button class="btn" data-add="input"><span class="dot" style="background:var(--in)"></span>Upload</button>
-      <button class="btn" data-add="output"><span class="dot" style="background:var(--out)"></span>Output</button>
-      <button class="btn" data-add="ai"><span class="dot" style="background:var(--ai)"></span>AI step</button>
-      <button class="btn" data-add="decide"><span class="dot" style="background:var(--dec)"></span>Decision</button>
+      <div class="pal" data-add="input" style="--kc:var(--in)"><span class="ic" data-i="up"></span><div><b>Upload</b><span class="s">a file you provide</span></div></div>
+      <div class="pal" data-add="output" style="--kc:var(--out)"><span class="ic" data-i="down"></span><div><b>Output</b><span class="s">a result to keep</span></div></div>
+      <div class="pal" data-add="ai" style="--kc:var(--ai)"><span class="ic" data-i="spark"></span><div><b>AI step</b><span class="s">a model does it</span></div></div>
+      <div class="pal" data-add="decide" style="--kc:var(--dec)"><span class="ic" data-i="branch"></span><div><b>Decision</b><span class="s">route by meaning</span></div></div>
     </div>
-    <div class="hint">Tools come from the Library tab. Click a card to place it.</div>
-  </section>
+  </div>
 
-  <section class="pane" data-pane="lib">
-    <input type="text" id="libQ" placeholder="Search nodes, types, tags…" style="margin-top:6px">
-    <div class="chips" id="libF">
-      <button class="chip on" data-f="all">All</button><button class="chip" data-f="verified">Verified</button>
-      <button class="chip" data-f="attention">Needs attention</button><button class="chip" data-f="wrapper">Wrappers</button>
-    </div>
+  <div class="pane" data-pane="lib">
+    <div class="search"><span data-i="search"></span><input type="text" id="libQ" placeholder="Search by name, purpose, type or use…"></div>
+    <div class="chips" id="libF"><button class="chip on" data-f="all">All</button><button class="chip" data-f="verified">Verified</button><button class="chip" data-f="attention">Needs attention</button><button class="chip" data-f="wrapper">Wrappers</button></div>
+    <h2>Node templates <span class="count" id="libN">0</span></h2>
     <div class="lib" id="lib"></div>
     <h2>Skills for LLMs</h2>
     <div class="hint" style="margin-top:0">One SKILL.md per verified node plus a playbook, so an agent knows when and how to use each tool.</div>
-    <div class="row">
-      <button class="btn sm" id="skGen">Generate</button>
-      <button class="btn sm" id="skCheck">Check activation</button>
-      <a class="btn sm" id="skZip" href="/api/skills.zip" style="text-decoration:none">Download bundle</a>
-    </div>
+    <div class="row"><button class="btn sm" id="skGen">Generate</button><button class="btn sm" id="skCheck">Check activation</button><a class="btn sm" href="/api/skills.zip">Download bundle</a></div>
     <div id="skOut" class="hint"></div>
-  </section>
+  </div>
 
-  <section class="pane" data-pane="add">
-    <div class="card"><h3>Scan a folder or git repo</h3>
-      <div class="hint">Reads the code without running it, then lists the tools, services and functions it found.</div>
+  <div class="pane" data-pane="add">
+    <div class="card"><h3>Tool sources</h3><div class="hint">Folders or git repos where your converters live. If a request needs a tool that is not registered, Constellation looks here, onboards what it finds and plans again.</div>
+      <div id="srcList"></div><input type="text" id="srcIn" placeholder="C:\\tools\\cgm-converter or https://git…">
+      <div class="row"><button class="btn" id="srcAdd">Add source</button><button class="btn primary" id="srcSync">Sync now</button></div><div id="srcOut" class="hint"></div></div>
+    <div class="card"><h3>Scan a folder or git repo</h3><div class="hint">Reads the code without running it, then lists the tools, services and functions it found.</div>
       <input type="text" id="crPath" placeholder="folder path or https://… git URL">
-      <div class="row"><button class="btn" id="crScan">Scan</button><button class="btn primary" id="crRun">Scan &amp; onboard all</button></div>
-    </div>
-    <div class="card"><h3>Wrap a library function</h3>
-      <div class="hint">For code with no command line: a function that just converts one thing into another.</div>
+      <div class="row"><button class="btn" id="crScan">Scan</button><button class="btn primary" id="crRun">Scan &amp; onboard all</button></div></div>
+    <div class="card"><h3>Wrap a library function</h3><div class="hint">For code with no command line: a function that just converts one thing into another.</div>
       <input type="text" id="wrPath" placeholder="path/to/module.py">
-      <div class="row"><button class="btn" id="wrFind">Find functions</button></div>
-      <div id="wrList"></div>
-    </div>
-    <div class="card"><h3>Onboard one tool</h3>
-      <div class="hint">Probes entry points, runs it on shipped samples, keeps it only if outputs really appear.</div>
+      <div class="row"><button class="btn" id="wrFind">Find functions</button></div><div id="wrList"></div></div>
+    <div class="card"><h3>Onboard one tool</h3><div class="hint">Probes entry points, runs it on shipped samples, keeps it only if outputs really appear.</div>
       <input type="text" id="obPath" placeholder="folder path, e.g. sample_tools/step2glb">
       <div class="row"><input type="file" id="obZip" accept=".zip,.py,.sh,.js,.exe,*"></div>
-      <div class="row"><button class="btn" id="obBtn">Analyze &amp; verify</button></div>
-    </div>
-  </section>
-</aside>
+      <div class="row"><button class="btn" id="obBtn">Analyze &amp; verify</button></div></div>
+  </div>
+</div></section>
+
+<main id="main">
+    <div id="marq"></div>
+  <div id="prog"><i></i></div>
+  <div class="top">
+    <button class="pillbtn" id="pTog" title="Toggle side panel (Ctrl B)"><span data-i="sidebar"></span></button>
+    <div class="crumb"><span class="a">Pipelines</span><span class="a">/</span><input type="text" id="pname" value="Untitled pipeline" spellcheck="false"><span class="draft" id="draft">Draft</span></div>
+    <div class="grow"></div>
+    <button class="pillbtn llm" id="llmChip"><i></i><span id="llmTxt">LLM off</span></button>
+    <button class="pillbtn" id="valBtn"><span data-i="check"></span>Validate</button>
+    <button class="btn primary" id="runBtn"><span data-i="play" class="fillicon"></span>Run</button>
+    <div style="position:relative"><button class="pillbtn" id="moreBtn"><span data-i="more"></span></button>
+      <div class="menu" id="menu">
+        <button data-m="layout"><span data-i="layout"></span>Auto-layout</button>
+        <button data-m="fit"><span data-i="fit"></span>Fit to view</button>
+        <hr>
+        <button data-m="export"><span data-i="down"></span>Export pipeline (JSON)</button>
+        <button data-m="import"><span data-i="up"></span>Import pipeline…</button>
+        <hr>
+        <button data-m="clear"><span data-i="trash"></span>Clear canvas</button>
+      </div></div>
+    <input type="file" id="impFile" accept=".json" hidden>
+  </div>
+
+  <div id="empty"><div class="box"><div class="orb"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="7" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M7.7 8.2l3 7.8M16.5 7.6l-3.4 8.6M8 7l8-1"/></svg></div>
+    <h3>What should we build?</h3>
+    <p>Describe the outcome in plain words. Constellation picks verified tools, checks every connection and lays out the pipeline.</p>
+    <div class="chips" id="exChips"><button class="chip">3d bom affiliate listing</button><button class="chip">convert csv to json</button><button class="chip">price the bom with margin</button><button class="chip">upper case a text file</button></div>
+    <p style="margin-top:14px;font-size:11.5px;color:var(--dim2)">Drag from a port to connect · drag on canvas to select · <span class="kbd">Space</span> drag to pan · <span class="kbd">Ctrl C</span> <span class="kbd">Ctrl V</span> copy &amp; paste</p></div></div>
+
+  <div id="world"><svg id="edges"></svg></div>
+  <div id="insp"></div>
+
+  <div class="dock" id="dock">
+    <button id="tSel" class="on" title="Select (V) — drag to box-select, Shift to add"><span data-i="cursor"></span></button>
+    <button id="tHand" title="Pan (H) — or hold Space and drag"><span data-i="hand"></span></button>
+    <span class="vr"></span>
+    <button id="tUndo" title="Undo (Ctrl Z)" disabled><span data-i="undo"></span></button>
+    <button id="tRedo" title="Redo (Ctrl Shift Z)" disabled><span data-i="redo"></span></button>
+  </div>
+  <button class="hintbar" id="tHint"><span class="kbd">/</span><span id="hintTxt">describe a pipeline or add a node</span></button>
+  <div id="qa"><input type="text" id="qaIn" placeholder="Describe a pipeline and press Enter, or search nodes and commands…" autocomplete="off" spellcheck="false"><div class="list" id="qaList"></div><div class="kmain"><span class="kbd">↵</span> run item <span class="kbd">⇧↵</span> build pipeline from text <span class="kbd">↑↓</span> move <span class="kbd">Esc</span> close</div></div>
+
+  <div class="mm"><div id="mmbox"><svg id="mm" viewBox="0 0 188 118" preserveAspectRatio="none"></svg></div>
+    <div class="zoom"><button id="zOut" title="Zoom out"><span data-i="minus"></span></button><span class="p" id="zPct">100%</span><button id="zIn" title="Zoom in"><span data-i="plus"></span></button><button id="zFit" title="Fit"><span data-i="fit"></span></button></div></div>
+
+  <div id="runlog"><header><span data-i="term"></span>Run log<span style="flex:1"></span><button class="btn sm ghost" id="rlClose">Close</button></header><div class="body" id="rlBody"></div></div>
+  <div class="status"><button id="logBtn"><span data-i="term"></span>Run log</button><button id="codeBtn"><span data-i="code"></span>JSON</button>
+    <span class="mid" id="stMsg">Nothing has run since you started editing</span><span id="stSave"><i class="dot"></i>Draft saved</span></div>
+</main>
+</div>
 
 <dialog id="setDlg">
-  <h3>AI settings</h3>
-  <div class="hint" style="margin-top:0">The model is optional. Without one, heuristics plan and decide.</div>
+  <h3>AI settings</h3><div class="hint" style="margin-top:0">The model is optional. Without one, heuristics plan and decide.</div>
   <label class="f">LLM provider</label>
-  <select id="sProv"><option value="none">none (heuristics only)</option><option value="anthropic">Anthropic (Claude)</option>
-    <option value="openai">OpenAI-compatible (OpenAI, OpenRouter, Ollama, vLLM, LM Studio)</option></select>
-  <div class="row"><button class="btn sm" id="sOllama">Use local Ollama</button><span class="hint" style="margin:6px 0 0">fills in http://localhost:11434 and lists your installed models</span></div>
-  <label class="f">Model</label><div class="row" style="margin-top:0"><input type="text" id="sModel" list="modelList" placeholder="claude-sonnet-5-5 · or pick from your server" style="flex:1"><button class="btn sm" id="sFetch" title="Ask the server which models it has">Fetch models</button></div><datalist id="modelList"></datalist><div id="sModels" class="chips"></div>
+  <select id="sProv"><option value="none">none (heuristics only)</option><option value="anthropic">Anthropic (Claude)</option><option value="openai">OpenAI-compatible (OpenAI, OpenRouter, Ollama, vLLM, LM Studio)</option></select>
+  <div class="row"><button class="btn sm" id="sOllama">Use local Ollama</button><span class="hint" style="margin:0">fills in localhost:11434 and lists your installed models</span></div>
+  <label class="f">Model</label>
+  <div class="row" style="margin-top:0"><input type="text" id="sModel" list="modelList" placeholder="claude-sonnet-5-5 · or pick from your server" style="flex:1"><button class="btn sm" id="sFetch">Fetch models</button></div>
+  <datalist id="modelList"></datalist><div id="sModels" class="chips"></div>
   <label class="f">Base URL (OpenAI-compatible / proxy only)</label><input type="text" id="sBase" placeholder="http://localhost:11434/v1">
   <label class="f">API key (stored only on this machine)</label><input type="text" id="sKey" placeholder="sk-ant-… / sk-… / leave empty for Ollama" autocomplete="off">
   <label class="f">Decision engine</label>
-  <select id="sDec"><option value="auto">auto (Laya if installed → LLM → heuristic)</option><option value="laya">Laya</option>
-    <option value="llm">LLM</option><option value="heuristic">heuristic only</option></select>
+  <select id="sDec"><option value="auto">auto (Laya if installed → LLM → heuristic)</option><option value="laya">Laya</option><option value="llm">LLM</option><option value="heuristic">heuristic only</option></select>
   <label class="f">Laya checkpoint (optional)</label><input type="text" id="sLaya" placeholder="english · multilingual · typed-decisions">
   <label class="f">Minimum confidence to trust a decision</label><input type="text" id="sConf" placeholder="0.5">
-  <div class="row" style="margin-top:14px"><button class="btn primary" id="sSave">Save &amp; test</button><button class="btn ghost" id="sClose">Close</button></div>
+  <div class="row" style="margin-top:16px"><button class="btn primary" id="sSave">Save &amp; test</button><button class="btn ghost" id="sClose">Close</button></div>
   <div id="sOut" class="hint"></div>
 </dialog>
-
-<main>
-  <div class="toolbar">
-    <button class="btn primary" id="runBtn">▶ Run</button>
-    <button class="btn" id="valBtn">Validate</button>
-    <span class="seg"><button class="btn ghost" id="layoutBtn">Auto-layout</button><button class="btn ghost" id="fitBtn">Fit</button><button class="btn ghost" id="clearBtn">Clear</button></span>
-    <span class="status" id="status"></span>
-  </div>
-  <div id="world"><svg id="edges"></svg></div>
-</main>
-
-<aside class="right insp" id="insp">
-  <h2 style="margin-top:0">Inspector</h2>
-  <div class="hint">Click a node. Connect by clicking an output port, then an input port. Click an edge to delete it.</div>
-</aside>
-</div>
+<div id="toasts"></div>
 
 <script>
-const S = {nodes: [], edges: [], reg: {}, files: {}, results: {}, sel: null, pending: null, seq: 1, view: {x: 0, y: 0, z: 1}};
+// ============================================================ icons (custom set, 24px grid)
+const IC = {
+  up: '<path d="M12 17V6M7.5 10.5L12 6l4.5 4.5M5 19h14"/>', down: '<path d="M12 5v11M7.5 12L12 16.5 16.5 12M5 20h14"/>',
+  spark: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>', branch: '<path d="M12 3l9 9-9 9-9-9z"/>',
+  tool: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
+  search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/>', check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  play: '<path d="M7 4.5l12 7.5-12 7.5z"/>', more: '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>',
+  layout: '<rect x="3.5" y="4" width="6" height="5" rx="1.5"/><rect x="14.5" y="3" width="6" height="5" rx="1.5"/><rect x="14.5" y="16" width="6" height="5" rx="1.5"/><path d="M9.5 6.5h2.5v11h2.5M12 11.5h2.5"/>',
+  fit: '<path d="M4 9V5a1 1 0 011-1h4M20 9V5a1 1 0 00-1-1h-4M4 15v4a1 1 0 001 1h4M20 15v4a1 1 0 01-1 1h-4"/>',
+  trash: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.9 12h9.2l.9-12"/>', copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M5 15V6.5A1.5 1.5 0 016.5 5H15"/>',
+  edit: '<path d="M4 20h4L19.5 8.5l-4-4L4 16z"/>', cursor: '<path d="M5 3.5l13.5 7.2-6 1.9-2 6.2z"/>',
+  hand: '<path d="M8 12.5V6.5a1.5 1.5 0 013 0V11m0-1V4.5a1.5 1.5 0 013 0V11m0-4.5a1.5 1.5 0 013 0V15a6 6 0 01-6 6h-.5a6 6 0 01-5-2.8l-2.2-3.6a1.4 1.4 0 012.3-1.5L8 14.2"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>', minus: '<path d="M5 12h14"/>', undo: '<path d="M9 6.5L4.5 11 9 15.5M4.5 11H14a5.5 5.5 0 010 11h-2"/>',
+  redo: '<path d="M15 6.5l4.5 4.5-4.5 4.5M19.5 11H10a5.5 5.5 0 000 11h2"/>', term: '<rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M7.5 10l3 2.5-3 2.5M13 15h4"/>',
+  code: '<path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/>', close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  csv: '<rect x="4" y="5" width="16" height="14" rx="2.5"/><path d="M4 10h16M4 14.5h16M10 5v14"/>',
+  json: '<path d="M9 4C7 4 6 5 6 7v2c0 1.2-1 2-2 3 1 1 2 1.8 2 3v2c0 2 1 3 3 3M15 4c2 0 3 1 3 3v2c0 1.2 1 2 2 3-1 1-2 1.8-2 3v2c0 2-1 3-3 3"/>',
+  html: '<path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/>', model: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
+  pdf: '<path d="M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 16h5"/>', text: '<path d="M5 7h14M5 12h14M5 17h9"/>',
+  image: '<rect x="4" y="5" width="16" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-4 4 3 3-2 4 3"/>',
+  sidebar: '<rect x="3.5" y="4.5" width="17" height="15" rx="3.5"/><path d="M9.5 4.5v15"/>', cmd: '<path d="M9 6.5a2.5 2.5 0 10-2.5 2.5H9m0-2.5V9m0-2.5h6m-6 2.5v6m0-6h6m0-2.5a2.5 2.5 0 112.5 2.5H15m0-2.5V9m0 6v2.5a2.5 2.5 0 102.5-2.5H15m-6 0H6.5A2.5 2.5 0 109 17.5V15m0 0h6"/>', gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
+  svg: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M7.5 15.5c2-6 4-6 5 0s3 3 4-4"/>', cgm: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 16l3-8 3 6 2-3"/>',
+  any: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/>'
+};
+const icon = (n, cls = "") => `<svg class="i ${cls}" viewBox="0 0 24 24">${IC[n] || IC.any}</svg>`;
+document.querySelectorAll("[data-i]").forEach(el => { const n = el.dataset.i; el.innerHTML = icon(n, el.classList.contains("fillicon") ? "fill" : ""); });
+
+// ============================================================ state & helpers
+const S = {nodes: [], edges: [], reg: {}, files: {}, results: {}, sel: null, pending: null, seq: 1, view: {x: 0, y: 0, z: 1},
+  hist: [], redo: [], ms: new Set(), es: new Set(), clip: null, pasteK: 0, dims: {}, name: "Untitled pipeline", dirty: false, lastRun: null, running: false, hand: false, itab: "d", savedAt: 0};
 const $ = s => document.querySelector(s);
-const world = $("#world"), svg = $("#edges");
+const world = $("#world"), svg = $("#edges"), mainEl = $("#main");
 const KC = {input: "var(--in)", tool: "var(--tool)", output: "var(--out)", ai: "var(--ai)", decide: "var(--dec)"};
+const KICON = {input: "up", output: "down", ai: "spark", decide: "branch", tool: "tool"};
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+async function api(path, opt) { const r = await fetch(path, opt); if (!r.ok) throw new Error(await r.text()); return r.json(); }
+const MC = [[/csv|tab-separated|spreadsheet/, "#3ddc97"], [/json/, "#fbbf24"], [/html/, "#f472b6"], [/step|gltf|model|stl/, "#a78bfa"], [/pdf/, "#fb7185"], [/svg|cgm/, "#f59e0b"], [/image/, "#38bdf8"], [/markdown|plain|text/, "#9aa3b5"]];
+const mimeColor = m => (MC.find(([re]) => re.test(m || "")) || [0, "#7d8496"])[1];
+const SHORT = {"text/csv": "csv", "application/json": "json", "text/html": "html", "text/plain": "text", "text/markdown": "md", "model/step": "step", "model/gltf-binary": "glb", "application/pdf": "pdf", "image/png": "png", "image/svg+xml": "svg", "image/cgm": "cgm", "image/jpeg": "jpg", "*/*": "any", "branch": "branch"};
+const short = m => SHORT[m] || String(m || "").split("/").pop();
+const mimeIcon = m => /svg/.test(m) ? "svg" : /cgm/.test(m) ? "cgm" : /csv/.test(m) ? "csv" : /json/.test(m) ? "json" : /html/.test(m) ? "html" : /step|gltf|model/.test(m) ? "model" : /pdf/.test(m) ? "pdf" : /image/.test(m) ? "image" : /text|markdown/.test(m) ? "text" : "any";
+function toast(msg, kind = "") { const t = document.createElement("div"); t.className = "toast " + kind; t.textContent = msg; $("#toasts").appendChild(t);
+  setTimeout(() => { t.style.transition = "opacity .3s"; t.style.opacity = 0; setTimeout(() => t.remove(), 300); }, 3800); }
+async function busy(btn, label, fn) { const old = btn.innerHTML; btn.disabled = true; btn.textContent = label; try { return await fn(); } finally { btn.disabled = false; btn.innerHTML = old; } }
+const compat = (a, b) => a === b || a === "*/*" || b === "*/*" || (b === "text/plain" && /^text\/|json/.test(a)) || (b === "text/markdown" && a === "text/plain");
+
+// ---- history / autosave
+const snap = () => JSON.stringify({nodes: S.nodes, edges: S.edges});
+function commit() { S.hist.push(snap()); if (S.hist.length > 60) S.hist.shift(); S.redo = []; touch(); }
+function touch() { S.dirty = true; clearTimeout(touch.t); touch.t = setTimeout(save, 350); updUndo(); statusBar(); }
+function save() { try { localStorage.setItem("constellation.draft", JSON.stringify({name: S.name, nodes: S.nodes, edges: S.edges, seq: S.seq})); S.savedAt = Date.now(); } catch (e) { /* storage may be blocked */ } statusBar(); }
+function restoreDraft() { try { const d = JSON.parse(localStorage.getItem("constellation.draft") || "null"); if (d && d.nodes && d.nodes.length) { S.nodes = d.nodes; S.edges = d.edges || []; S.name = d.name || S.name; S.seq = d.seq || S.seq; $("#pname").value = S.name; return true; } } catch (e) { /* ignore */ } return false; }
+function undo() { if (!S.hist.length) return; S.redo.push(snap()); const g = JSON.parse(S.hist.pop()); S.nodes = g.nodes; S.edges = g.edges; S.sel = null; S.ms.clear(); S.es.clear(); afterGraph(); }
+function redo() { if (!S.redo.length) return; S.hist.push(snap()); const g = JSON.parse(S.redo.pop()); S.nodes = g.nodes; S.edges = g.edges; S.sel = null; S.ms.clear(); S.es.clear(); afterGraph(); }
+function afterGraph() { render(); inspect(); touch(); }
+function updUndo() { $("#tUndo").disabled = !S.hist.length; $("#tRedo").disabled = !S.redo.length; }
+function statusBar() {
+  const d = $("#draft"), m = $("#stMsg");
+  if (S.running) { m.textContent = "Running…"; d.textContent = "Running"; d.className = "draft"; }
+  else if (S.lastRun && !S.dirty) { m.textContent = `Last run ${S.lastRun.id}: ${S.lastRun.ok ? "all nodes done" : "some nodes failed"}`; d.textContent = S.lastRun.ok ? "Ran" : "Failed"; d.className = "draft " + (S.lastRun.ok ? "ran" : "fail"); }
+  else { m.textContent = S.lastRun ? "Edited since the last run" : "Nothing has run since you started editing"; d.textContent = "Draft"; d.className = "draft"; }
+  const sec = Math.round((Date.now() - S.savedAt) / 1000);
+  $("#stSave").innerHTML = `<i class="dot"></i>${S.savedAt ? (sec < 5 ? "Draft saved" : `Draft saved ${sec < 60 ? sec + "s" : Math.round(sec / 60) + "m"} ago`) : "Draft not saved yet"}`;
+}
+setInterval(statusBar, 5000);
+
+// ============================================================ library
+// ---- node search: weighted match over name, tags, description, port names/types, node notes and the SKILL.md (when-to-use phrases)
+const Q = {q: "", f: "all", tab: "build"};
+const STOP = new Set(["a", "an", "the", "to", "from", "for", "of", "my", "into", "me", "and", "or", "with", "this", "that", "please", "i", "want", "need"]);
+const stem = w => w.length > 4 ? w.replace(/(ing|ies|es|s)$/, m => m === "ies" ? "y" : "") : w;
+const toks = t => String(t || "").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).map(stem);
+const SYN = {picture: "image", img: "image", drawing: "image", vector: "svg", spreadsheet: "csv", table: "csv", "3d": "glb", model: "glb", website: "html", webpage: "html", page: "html", doc: "text", document: "text", price: "pricing", cost: "pricing", compare: "comparison"};
+function nodeIndex(m) {
+  if (m._ix) return m._ix;
+  const ports = [...m.inputs, ...m.outputs], mimes = ports.map(p => p.mime + " " + short(p.mime));
+  const ix = {name: toks(m.id + " " + (m.name || "")), tags: toks((m.tags || []).join(" ")),
+    desc: toks(m.description), ports: toks(ports.map(p => p.name + " " + (p.description || "")).join(" ") + " " + mimes.join(" ")),
+    doc: toks((m.skill || "") + " " + (m.md || "")), skillText: m.skill || m.md || ""};
+  for (const k of Object.keys(ix)) if (Array.isArray(ix[k])) ix[k + "Set"] = new Set(ix[k]);
+  return m._ix = ix;
+}
+const FW = [["name", 5, "name"], ["tags", 3, "tags"], ["desc", 3, "description"], ["ports", 2, "ports & types"], ["doc", 1, "skill & notes"]];
+function scoreNode(m, q) {
+  const ws = toks(q).filter(w => !STOP.has(w)), words = ws.length ? ws : toks(q); if (!words.length) return {score: 1, why: ""};
+  const ix = nodeIndex(m); let total = 0, hits = 0; const whyCount = {};
+  for (const w of words) {
+    const alts = [w, SYN[w] && stem(SYN[w])].filter(Boolean); let best = 0, bestField = "";
+    for (const [f, wt, label] of FW) for (const [i, a] of alts.entries()) {
+      const set = ix[f + "Set"], hit = set.has(a) ? 1 : ix[f].some(t => t.startsWith(a) && a.length >= (f === "doc" ? 3 : 2)) ? .65 : (a.length >= 4 && ix[f].some(t => t.includes(a))) ? .35 : 0;
+      if (f === "doc" && a.length < 3) continue;
+      const sc = hit * wt * (i ? .8 : 1); if (sc > best) { best = sc; bestField = label; }
+    }
+    if (!best) continue;   // a word that matches nothing only lowers the rank
+    hits++; total += best; whyCount[bestField] = (whyCount[bestField] || 0) + best;
+  }
+  if (!hits || hits < Math.ceil(words.length * 0.5)) return {score: 0, why: ""};
+  const field = Object.entries(whyCount).sort((a, b) => b[1] - a[1])[0][0];
+  let why = "matched " + field;
+  if (field === "skill & notes") { const t = ix.skillText, i = t.toLowerCase().indexOf(words[0]); if (i >= 0) why = "…" + t.slice(Math.max(0, i - 24), i + 48).replace(/\s+/g, " ").trim() + "…"; }
+  return {score: total, why};
+}
+const searchNodes = (list, q) => q.trim() ? list.map(m => ({m, ...scoreNode(m, q)})).filter(r => r.score > 0).sort((a, b) => b.score - a.score) : list.map(m => ({m, score: 0, why: ""}));
+function libMatches(m) {
+  if (Q.f === "verified") return m.verification.status === "verified";
+  if (Q.f === "attention") return m.verification.status !== "verified" || !m.human_approved;
+  if (Q.f === "wrapper") return m.origin === "wrapper";
+  return true;
+}
+function renderLib() {
+  const all = Object.values(S.reg), found = searchNodes(all.filter(libMatches), Q.q), list = found.map(r => r.m), why = Object.fromEntries(found.map(r => [r.m.id, r.why]));
+  $("#libCount").textContent = all.length; $("#libN").textContent = list.length;
+  $("#lib").innerHTML = list.map(m => {
+    const om = (m.outputs[0] || {}).mime || "*/*", c = mimeColor(om);
+    return `<div class="tpl" draggable="true" data-tool="${esc(m.id)}" title="${esc(Q.q && why[m.id] ? why[m.id] + " · " : "")}${esc(m.description || "")}">
+      ${m.origin === "wrapper" ? `<span class="wr">WRAP</span>` : ""}<span class="st ${m.verification.status}"></span>
+      <div class="tile" style="--tc:${c}">${icon(mimeIcon(om))}</div><div class="nm">${esc(m.id)}</div>
+      ${Q.q && why[m.id] ? `<div class="why">${esc(why[m.id])}</div>` : ""}<div class="io">${m.inputs.filter(p => p.kind !== "param").map(p => esc(short(p.mime))).join("+") || "—"} → ${m.outputs.map(p => esc(short(p.mime))).join(",")}</div></div>`;
+  }).join("") || `<div class="empty">${all.length ? "Nothing matches." : "No nodes yet. Open <b>Add tools</b> to scan a repo, wrap a function or onboard a tool."}</div>`;
+}
+async function loadReg() {
+  let list;
+  try { list = await api("/api/nodes"); }
+  catch (e) { $("#lib").innerHTML = `<div class="errs" style="grid-column:1/-1">Could not load the node list: ${esc(e.message)}<div class="row"><button class="btn sm" id="retryReg">Retry</button></div></div>`; $("#retryReg").onclick = () => loadReg(); throw e; }
+  S.reg = Object.fromEntries(list.map(m => [m.id, m]));
+  try { renderLib(); } catch (e) { $("#lib").innerHTML = `<div class="errs">Library display error: ${esc(e.message)}</div>`; }
+  render(); inspect();
+  try { const st = await api("/api/status"), on = st.llm !== "none";
+    $("#llmChip").classList.toggle("on", on); $("#llmTxt").textContent = on ? `${st.llm} · ${st.model}` : "LLM off";
+  } catch (e) { $("#llmTxt").textContent = "status unavailable"; }
+}
+const TITLES = {build: ["Build", "Describe an outcome. Constellation picks verified tools."], lib: ["Node library", "Verified tools, ready to drag onto the canvas."], add: ["Add tools", "Scan a repo, wrap a function, or onboard one tool."]};
+function setTab(t) {
+  const same = Q.tab === t && !$("#app").classList.contains("nopanel");
+  if (same && t !== "build") { $("#app").classList.add("nopanel"); document.querySelectorAll(".rb[data-tab]").forEach(b => b.classList.remove("on")); setTimeout(drawEdges, 280); return; }
+  $("#app").classList.remove("nopanel"); Q.tab = t;
+  document.querySelectorAll(".rb[data-tab]").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
+  document.querySelectorAll(".pane").forEach(p => p.classList.toggle("on", p.dataset.pane === t));
+  $("#ptitle").textContent = TITLES[t][0]; $("#psub").textContent = TITLES[t][1];
+  setTimeout(drawEdges, 280);
+}
+document.querySelectorAll(".rb[data-tab]").forEach(b => b.onclick = () => setTab(b.dataset.tab));
+$("#libQ").oninput = e => { Q.q = e.target.value; renderLib(); };
+$("#libF").onclick = ev => { const c = ev.target.closest(".chip"); if (!c) return; Q.f = c.dataset.f; document.querySelectorAll("#libF .chip").forEach(x => x.classList.toggle("on", x === c)); renderLib(); };
+
+// ============================================================ graph model
 function decideOptions(n) {
   const o = n.options || "yes: \nno: ";
   if (typeof o !== "string") return Object.keys(o);
   const names = o.split("\n").map(l => l.split(":")[0].trim().replace(/[^a-zA-Z0-9_]+/g, "_").replace(/^_+|_+$/g, "")).filter(Boolean);
   return names.length ? names : ["yes", "no"];
 }
-const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-
-async function api(path, opt) { const r = await fetch(path, opt); if (!r.ok) throw new Error(await r.text()); return r.json(); }
-
-const Q = {q: "", f: "all", tab: "build"};
-function libMatches(m) {
-  const t = (m.id + " " + (m.description || "") + " " + (m.tags || []).join(" ") + " " + m.inputs.map(p => p.mime).join(" ") + " " + m.outputs.map(p => p.mime).join(" ")).toLowerCase();
-  if (Q.q && !Q.q.toLowerCase().split(/\s+/).every(w => t.includes(w))) return false;
-  if (Q.f === "verified") return m.verification.status === "verified";
-  if (Q.f === "attention") return m.verification.status !== "verified" || !m.human_approved;
-  if (Q.f === "wrapper") return m.origin === "wrapper";
-  return true;
-}
-const short = mime => ({"text/csv": "csv", "application/json": "json", "text/html": "html", "text/plain": "text", "text/markdown": "md", "model/step": "step",
-  "model/gltf-binary": "glb", "application/pdf": "pdf", "image/png": "png", "*/*": "any"})[mime] || mime.split("/").pop();
-function renderLib() {
-  const all = Object.values(S.reg), list = all.filter(libMatches);
-  $("#libCount").textContent = all.length;
-  $("#lib").innerHTML = list.map(m => `<div class="libitem" data-tool="${esc(m.id)}" title="${esc(m.description || "")}">
-    <span class="sdot ${m.verification.status}"></span>
-    <span class="nm">${esc(m.id)}</span>
-    <span class="pill ${m.verification.status}" style="margin:0">${m.verification.status}</span>
-    <div class="types">${m.inputs.filter(p => p.kind !== "param").map(p => esc(short(p.mime))).join(" + ") || "—"} → ${m.outputs.map(p => esc(short(p.mime))).join(", ")}${m.origin === "wrapper" ? `<span class="tag wrap">wrapper</span>` : ""}</div></div>`).join("")
-    || `<div class="empty">${all.length ? "Nothing matches." : "No nodes yet. Open <b>Add tools</b> to scan a repo, wrap a function or onboard a tool."}</div>`;
-}
-async function loadReg() {
-  let list;
-  try { list = await api("/api/nodes"); }
-  catch (e) {
-    $("#lib").innerHTML = `<div class="errs">Could not load the node list: ${esc(e.message)}</div><div class="row"><button class="btn sm" id="retryReg">Retry</button></div>`;
-    $("#retryReg").onclick = () => loadReg().then(render);
-    throw e;
-  }
-  S.reg = Object.fromEntries(list.map(m => [m.id, m]));
-  try { renderLib(); } catch (e) { $("#lib").innerHTML = `<div class="errs">Library display error: ${esc(e.message)}</div>`; }
-  render(); inspect();
-  let st;
-  try { st = await api("/api/status"); } catch (e) { $("#status").textContent = "status unavailable: " + e.message; return; }
-  const missing = Object.entries(st.runtimes || {}).filter(([k, v]) => v === "MISSING" && ["node", "bash", "cc"].includes(k)).map(([k]) => k);
-  $("#status").textContent = `LLM: ${st.llm === "none" ? "off (heuristics only)" : st.llm + " · " + st.model}` +
-    (missing.length ? ` · missing runtimes: ${missing.join(", ")}` : "");
-}
-function setTab(t) {
-  Q.tab = t;
-  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
-  document.querySelectorAll(".pane").forEach(p => p.classList.toggle("on", p.dataset.pane === t));
-}
-$("#tabs").onclick = ev => { const b = ev.target.closest("button"); if (b) setTab(b.dataset.tab); };
-$("#libQ").oninput = ev => { Q.q = ev.target.value; renderLib(); };
-$("#libF").onclick = ev => { const c = ev.target.closest(".chip"); if (!c) return; Q.f = c.dataset.f;
-  document.querySelectorAll("#libF .chip").forEach(x => x.classList.toggle("on", x === c)); renderLib(); };
-$("#gear").onclick = () => $("#setDlg").showModal();
-async function fetchModels() {
-  const q = new URLSearchParams({base_url: $("#sBase").value.trim(), api_key: $("#sKey").value.trim()});
-  $("#sModels").innerHTML = `<span class="hint">asking the server…</span>`;
-  try {
-    const r = await api("/api/models?" + q);
-    if (!$("#sBase").value.trim() || r.server === "ollama") $("#sBase").value = r.base_url;
-    if (r.server === "ollama" || $("#sProv").value === "none") $("#sProv").value = "openai";
-    $("#modelList").innerHTML = r.models.map(m => `<option value="${esc(m.name)}">`).join("");
-    $("#sModels").innerHTML = r.models.length ? r.models.map(m => `<button class="chip ${m.name === $("#sModel").value ? "on" : ""}" data-m="${esc(m.name)}">${esc(m.name)}${m.size ? " · " + (m.size / 1e9).toFixed(1) + " GB" : ""}</button>`).join("")
-      : `<span class="hint">${esc(r.server)} is running but has no models. For Ollama: <code>ollama pull llama3.1</code></span>`;
-  } catch (e) { $("#sModels").innerHTML = `<div class="errs">${esc(e.message)}</div>`; }
-}
-$("#sFetch").onclick = fetchModels;
-$("#sOllama").onclick = () => { $("#sProv").value = "openai"; $("#sBase").value = "http://localhost:11434/v1"; $("#sKey").value = ""; fetchModels(); };
-$("#sModels").onclick = ev => { const c = ev.target.closest("[data-m]"); if (!c) return; $("#sModel").value = c.dataset.m;
-  document.querySelectorAll("#sModels .chip").forEach(x => x.classList.toggle("on", x === c)); };
-$("#sClose").onclick = () => $("#setDlg").close();
-
 function ports(n) {
   if (n.kind === "decide") return {ins: [{name: "in", mime: "text/plain"}], outs: decideOptions(n).map(o => ({name: o, mime: "branch"}))};
   if (n.kind === "input") return {ins: [], outs: [{name: "file", mime: n.mime || "*/*"}]};
   if (n.kind === "output") return {ins: [{name: "file", mime: "*/*"}], outs: []};
   if (n.kind === "ai") return {ins: [{name: "in", mime: "text/plain"}], outs: [{name: "out", mime: n.mime || "text/markdown"}]};
-  const m = S.reg[n.tool]; if (!m) return {ins: [{name: "(node '" + n.tool + "' not in library)", mime: "reload"}], outs: []};
-  return {ins: m.inputs.filter(p => p.kind !== "param").map(p => ({name: p.name, mime: p.mime, req: p.required})),
-          outs: m.outputs.map(p => ({name: p.name, mime: p.mime}))};
+  const m = S.reg[n.tool]; if (!m) return {ins: [{name: "(not in library)", mime: "reload"}], outs: []};
+  return {ins: m.inputs.filter(p => p.kind !== "param").map(p => ({name: p.name, mime: p.mime, req: p.required})), outs: m.outputs.map(p => ({name: p.name, mime: p.mime}))};
 }
-
 function title(n) {
-  if (n.kind === "decide") return n.question ? n.question.slice(0, 40) : "Decision";
+  if (n.kind === "decide") return n.question ? n.question.slice(0, 44) : "Decision";
   return n.kind === "tool" ? n.tool : n.kind === "input" ? (n.label || "Upload") : n.kind === "output" ? (n.label || "Output") : "AI step";
 }
-
+function subtitle(n) {
+  if (n.kind === "tool") return (S.reg[n.tool] || {}).description || "";
+  if (n.kind === "ai") return n.prompt || ""; if (n.kind === "decide") return "Routes the input to one branch"; if (n.kind === "input") return "File you provide"; return "Result to keep";
+}
+// ---- previews (3D, images/SVG, html, tables, file info), cached so models do not reload on every redraw
+const PVC = new Map(), MODEL = /\.(glb|gltf)$/i, IMG = /\.(svg|png|jpe?g|gif|webp)$/i, HTMLF = /\.html?$/i, TXT = /\.(csv|tsv|json|txt|md)$/i;
+const PREF = [MODEL, /\.svg$/i, IMG, HTMLF, /\.csv$/i, /\.json$/i];
+const fmtSize = b => b > 1e6 ? (b / 1e6).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1e3)) + " KB";
+function previewSpec(n) {
+  if (n.kind === "input") { const f = S.files[n.id]; if (!f) return null; if (!f._url) f._url = URL.createObjectURL(f); return {key: n.id + "|" + f.name + f.size, url: f._url, name: f.name, size: f.size}; }
+  const r = S.results[n.id]; if (!r || r.status !== "done" || !r.urls) return null;
+  const us = Object.values(r.urls); let best = null;
+  for (const re of PREF) { best = us.find(u => re.test(u)); if (best) break; }
+  best = best || us[0]; return best ? {key: n.id + "|" + best, url: best, name: best.split("/").pop(), size: null} : null;
+}
+function txtPreview(t, ext) {
+  if (ext === "csv" || ext === "tsv") { const sep = ext === "tsv" ? "\t" : ","; const rows = t.trim().split(/\r?\n/).slice(0, 9).map(l => l.split(sep).slice(0, 6));
+    return "<table>" + rows.map((r, i) => "<tr>" + r.map(c => i ? `<td>${esc(c)}</td>` : `<th>${esc(c)}</th>`).join("") + "</tr>").join("") + "</table>"; }
+  if (ext === "json") { try { t = JSON.stringify(JSON.parse(t), null, 1); } catch (e) { /* show raw */ } }
+  return esc(t.slice(0, 1500));
+}
+function getPV(sp) {
+  if (PVC.has(sp.key)) return PVC.get(sp.key);
+  const d = document.createElement("div"); d.style.display = "contents"; const ext = (sp.name.split(".").pop() || "").toLowerCase();
+  if (MODEL.test(sp.name)) d.innerHTML = `<span class="tag">3D · drag to orbit</span><model-viewer src="${sp.url}" camera-controls auto-rotate disable-zoom interaction-prompt="none" shadow-intensity="1" exposure="1.1" touch-action="pan-y"></model-viewer>`;
+  else if (IMG.test(sp.name)) d.innerHTML = `<span class="tag">${esc(ext)}</span><img alt="" src="${sp.url}" draggable="false">`;
+  else if (HTMLF.test(sp.name)) d.innerHTML = `<span class="tag">html</span><iframe sandbox src="${sp.url}"></iframe>`;
+  else if (TXT.test(sp.name)) { d.innerHTML = `<span class="tag">${esc(ext)}</span><div class="tbl">loading…</div>`; fetch(sp.url).then(r => r.text()).then(t => { d.querySelector(".tbl").innerHTML = txtPreview(t, ext); }).catch(() => {}); }
+  else d.innerHTML = `<div class="info"><b>${esc((ext || "file").toUpperCase())}</b><span>${esc(sp.name)}${sp.size != null ? " · " + fmtSize(sp.size) : ""}</span><span>no in-browser preview</span></div>`;
+  PVC.set(sp.key, d); return d;
+}
+// ---- inline controls: colour pickers, numbers, sliders, toggles, selects, model picker
+S.models = [];
+async function loadModels() {
+  try { const st = await api("/api/settings"); if (st.llm.provider === "anthropic") { S.models = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]; return; }
+    if (st.llm.provider === "none" && !st.llm.base_url) { S.models = []; return; }
+    const r = await api("/api/models?" + new URLSearchParams({base_url: st.llm.base_url || ""})); S.models = r.models.map(m => m.name); } catch (e) { S.models = []; }
+}
+const modelOpts = cur => `<option value="">default model</option>` + [...new Set([...(S.models || []), ...(cur ? [cur] : [])])].map(m => `<option ${m === cur ? "selected" : ""}>${esc(m)}</option>`).join("");
+const MIMEOPTS = [["text/markdown", "markdown"], ["application/json", "json"], ["text/html", "html"], ["text/csv", "csv"], ["image/svg+xml", "svg"]];
+function widgetOf(p) {
+  const w = (p.widget || "").toLowerCase(), d = p.default, nm = p.name.toLowerCase(); if (w) return w;
+  if (/colou?r|hex|rgb|fill|stroke/.test(nm) || /^#[0-9a-f]{3,8}$/i.test(d || "")) return "color";
+  if (/^(true|false)$/i.test(d || "")) return "bool";
+  if (d != null && d !== "" && !isNaN(d)) return "number";
+  const m = (p.description || "").match(/(?:one of|choices?|options?)[:\s]*\{?\[?([\w.\-]+(?:\s*[|,\/]\s*[\w.\-]+)+)/i);
+  return m ? "select:" + m[1].split(/\s*[|,\/]\s*/).join("|") : "text";
+}
+function wRow(n, p) {
+  const v = String((n.params || {})[p.name] ?? p.default ?? ""), w = widgetOf(p), nm = esc(p.name), lab = `<label title="${esc(p.description || p.name)}">${nm}${p.required ? " *" : ""}</label>`; let c;
+  if (w === "color") c = `<input type="color" data-p="${nm}" value="${/^#[0-9a-f]{6}$/i.test(v) ? v : "#000000"}"><input type="text" data-p="${nm}" data-hex value="${esc(v)}" placeholder="#rrggbb">`;
+  else if (w === "bool") c = `<button class="tg ${/^true$/i.test(v) ? "on" : ""}" data-tg="${nm}" type="button"></button>`;
+  else if (w.startsWith("range")) { const [a, b] = (w.split(":")[1] || "0-1").split("-").map(Number), val = v === "" ? a : v; c = `<input type="range" data-p="${nm}" min="${a}" max="${b}" step="${b - a <= 2 ? 0.01 : 1}" value="${esc(val)}"><span class="rv">${esc(val)}</span>`; }
+  else if (w === "number") c = `<input type="number" data-p="${nm}" value="${esc(v)}" step="any">`;
+  else if (w.startsWith("select")) c = `<select data-p="${nm}">${w.slice(7).split("|").map(o => `<option ${o === v ? "selected" : ""}>${esc(o)}</option>`).join("")}</select>`;
+  else if (w === "area") return `<div class="w stack">${lab}<div class="c"><textarea data-p="${nm}">${esc(v)}</textarea></div></div>`;
+  else c = `<input type="text" data-p="${nm}" value="${esc(v)}" placeholder="${esc(p.description || "")}">`;
+  return `<div class="w">${lab}<div class="c">${c}</div></div>`;
+}
+function pwHTML(n) {
+  let rows = "";
+  if (n.kind === "tool") { const m = S.reg[n.tool]; if (m) rows += m.inputs.filter(p => p.kind === "param").map(p => wRow(n, p)).join(""); }
+  if (n.kind === "ai") rows += `<div class="w stack"><label>Prompt</label><div class="c"><textarea data-k="prompt" rows="2">${esc(n.prompt)}</textarea></div></div>
+    <div class="w"><label>Model</label><div class="c"><select data-k="model">${modelOpts(n.model)}</select></div></div>
+    <div class="w"><label>Output</label><div class="c"><select data-k="mime">${MIMEOPTS.map(([v, l]) => `<option value="${v}" ${v === n.mime ? "selected" : ""}>${l}</option>`).join("")}</select></div></div>`;
+  if (n.kind === "decide") rows += `<div class="w stack"><label>Question</label><div class="c"><textarea data-k="question" rows="2">${esc(n.question)}</textarea></div></div>`;
+  return rows ? `<div class="pw">${rows}</div>` : "";
+}
+const RO = new ResizeObserver(() => { cancelAnimationFrame(RO.t); RO.t = requestAnimationFrame(() => { world.querySelectorAll(".node").forEach(e => S.dims[e.dataset.id] = [e.offsetWidth, e.offsetHeight]); drawEdges(); }); });
+const seen = new Set();
 function render() {
+  RO.disconnect();
+  if (S.sel) S.ms = new Set([S.sel]);
+  S.ms = new Set([...S.ms].filter(id => S.nodes.some(n => n.id === id)));
+  updHint();
   world.querySelectorAll(".node").forEach(e => e.remove());
+  $("#empty").style.display = S.nodes.length ? "none" : "grid";
+  document.querySelector(".mm").classList.toggle("hide", !S.nodes.length);
+  $("#tHint").style.display = $("#qa").classList.contains("open") ? "none" : "";
   for (const n of S.nodes) {
-    const {ins, outs} = ports(n), res = S.results[n.id];
-    const el = document.createElement("div");
-    el.className = `node ${S.sel === n.id ? "sel" : ""} ${res ? res.status : ""}`;
-    el.style.left = n.x + "px"; el.style.top = n.y + "px"; el.dataset.id = n.id;
+    const {ins, outs} = ports(n), res = S.results[n.id], el = document.createElement("div");
+    const fresh = !seen.has(n.id); seen.add(n.id);
+    el.className = `node ${S.ms.has(n.id) ? "sel" : ""} ${res ? res.status : ""} ${fresh ? "new" : ""}`;
+    el.style.left = n.x + "px"; el.style.top = n.y + "px"; el.dataset.id = n.id; el.style.setProperty("--kc", KC[n.kind]);
+    const stat = res && ["running", "done", "failed"].includes(res.status) ? `<span class="stat ${res.status}">${res.status === "running" ? `<i class="spin"></i>running` : res.status === "done" ? "✓ done" : "✕ failed"}</span>` : "";
+    const port = (p, dir) => `<div class="pr" style="--pc:${mimeColor(p.mime)}"><i class="c" data-port="${dir}" data-node="${n.id}" data-name="${esc(p.name)}" data-mime="${esc(p.mime)}"></i><span class="pn">${esc(p.name)}${p.req === false ? "?" : ""}</span><span class="pt">${esc(short(p.mime))}</span></div>`;
+    const sp = previewSpec(n);
     let foot = "";
-    if (n.kind === "input") foot = `<div class="nf"><input type="file" data-file="${n.id}">${S.files[n.id] ? `<div class="fname">${esc(S.files[n.id].name)}</div>` : ""}</div>`;
-    if (n.kind === "output" && res && res.urls && res.urls.file) foot = `<div class="nf"><a class="outlink" target="_blank" href="${res.urls.file}">${esc(res.urls.file.split("/").pop())}</a></div>`;
-    if (n.kind === "decide" && res && res.decision) foot = `<div class="nf sub">→ <b>${esc(res.decision.choice)}</b> · ${esc(res.decision.backend)} · ${(+res.decision.confidence).toFixed(2)}</div>`;
-    if (res && res.status === "skipped") foot += `<div class="nf sub">skipped (branch not taken)</div>`;
-    if (n.kind === "tool") foot = `<div class="nf sub">backend: ${esc(n.backend || "local")}${res ? ` · ${res.seconds}s` : ""}</div>`;
-    if (res && res.status === "failed") foot += `<div class="nf errs">${esc((res.errors || []).join("\n"))}</div>`;
-    el.innerHTML = `<div class="nh"><span class="dot" style="background:${KC[n.kind]}"></span><span class="t">${esc(title(n))}</span><span class="k">${n.kind}</span></div>
-      <div class="nb">${ins.map(p => `<div class="port in"><span class="c" data-port="in" data-node="${n.id}" data-name="${esc(p.name)}"></span>${esc(p.name)}${p.req === false ? "?" : ""} <span class="m">${esc(p.mime)}</span></div>`).join("")}
-      ${outs.map(p => `<div class="port out"><span class="m">${esc(p.mime)}</span> ${esc(p.name)}<span class="c" data-port="out" data-node="${n.id}" data-name="${esc(p.name)}"></span></div>`).join("")}</div>${foot}`;
-    world.appendChild(el);
+    if (n.kind === "input") foot = `<label class="dz ${S.files[n.id] ? "has" : ""}" data-drop="${n.id}"><input type="file" data-file="${n.id}">${icon("up")}<span>${S.files[n.id] ? esc(S.files[n.id].name) : "Choose or drop a file"}</span></label>`;
+    else {
+      if (n.kind === "tool") foot += `<span class="fchip">${esc(n.backend || "local")}${res && res.seconds != null ? ` · ${res.seconds}s` : ""}</span>`;
+      if (n.kind === "output" && res && res.urls && res.urls.file) foot += `<a class="outlink" target="_blank" href="${res.urls.file}">${esc(res.urls.file.split("/").pop())}</a>`;
+      if (n.kind === "decide" && res && res.decision) foot += `<span class="fchip ok">→ ${esc(res.decision.choice)} · ${esc(res.decision.backend)} · ${(+res.decision.confidence).toFixed(2)}</span>`;
+      if (res && res.status === "skipped") foot += `<span class="fchip">skipped (branch not taken)</span>`;
+    }
+    if (res && res.status === "failed") foot += `<span class="fchip bad">${esc((res.errors || []).join("\n").slice(0, 220))}</span>`;
+    el.innerHTML = `<div class="ntb"><button data-act="edit" title="Details">${icon("edit")}</button><button data-act="dup" title="Duplicate">${icon("copy")}</button><button class="del" data-act="del" title="Delete">${icon("trash")}</button></div>
+      <div class="nhead"><span class="ico">${icon(KICON[n.kind])}</span><span class="kind">${n.kind === "decide" ? "decision" : n.kind === "ai" ? "ai step" : n.kind}</span>${stat}</div>
+      <div class="ntitle">${esc(title(n))}</div><div class="nsub">${esc(subtitle(n))}</div>
+      ${sp ? `<div class="pv"></div>` : ""}
+      <div class="ports"><div class="pcol in">${ins.map(p => port(p, "in")).join("")}</div><div class="pcol out">${outs.map(p => port(p, "out")).join("")}</div></div>
+      ${pwHTML(n)}${foot ? `<div class="nfoot">${foot}</div>` : ""}`;
+    if (sp) el.querySelector(".pv").appendChild(getPV(sp));
+    world.appendChild(el); RO.observe(el); S.dims[n.id] = [el.offsetWidth, el.offsetHeight];
   }
   drawEdges();
 }
-
 function portXY(node, dir, name) {
-  const c = world.querySelector(`.c[data-node="${node}"][data-port="${dir}"][data-name="${CSS.escape(name)}"]`);
-  if (!c) return null;
+  const c = world.querySelector(`.c[data-node="${node}"][data-port="${dir}"][data-name="${CSS.escape(name)}"]`); if (!c) return null;
   const a = c.getBoundingClientRect(), b = world.getBoundingClientRect(), z = S.view.z;
   return [(a.left - b.left + a.width / 2) / z, (a.top - b.top + a.height / 2) / z];
 }
-
+const curve = (p, q) => { const dx = Math.max(50, Math.abs(q[0] - p[0]) / 2); return `M${p[0]},${p[1]} C${p[0] + dx},${p[1]} ${q[0] - dx},${q[1]} ${q[0]},${q[1]}`; };
 function drawEdges() {
-  svg.innerHTML = S.edges.map((e, i) => {
-    const p = portXY(e.src, "out", e.src_port), q = portXY(e.dst, "in", e.dst_port);
-    if (!p || !q) return "";
-    const dx = Math.max(60, Math.abs(q[0] - p[0]) / 2);
-    const live = S.results[e.src] && S.results[e.src].status === "done";
-    return `<path data-edge="${i}" class="${live ? "live" : ""}" d="M${p[0]},${p[1]} C${p[0] + dx},${p[1]} ${q[0] - dx},${q[1]} ${q[0]},${q[1]}"/>`;
-  }).join("");
+  const out = [];
+  if (S.nodes.some(n => !isFinite(n.x))) { svg.innerHTML = ""; return; }
+  S.edges.forEach((e, i) => {
+    const p = portXY(e.src, "out", e.src_port), q = portXY(e.dst, "in", e.dst_port); if (!p || !q) return;
+    const sn = S.nodes.find(n => n.id === e.src), sp = sn && ports(sn).outs.find(o => o.name === e.src_port), col = mimeColor(sp ? sp.mime : "");
+    const d = curve(p, q), sr = S.results[e.src], dr = S.results[e.dst], live = sr && sr.status === "done";
+    const hl = S.ms.size && (S.ms.has(e.src) || S.ms.has(e.dst)), esel = S.es.has(ekey(e)) || (S.ms.size > 1 && S.ms.has(e.src) && S.ms.has(e.dst)), flow = S.running || (live && dr && dr.status === "running");
+    out.push(`<path data-edge="${i}" class="pipe ${live ? "live" : ""} ${hl ? "hl" : ""} ${esel ? "esel" : ""} ${flow ? "flow" : ""}" style="--ec:${col}" d="${d}"><title>Click to select · Del removes · double-click removes</title></path>`);
+    if (live && !S.running) out.push(`<circle class="pk" r="3.4" fill="${col}" style="--ec:${col}"><animateMotion dur="${(1.8 + (i % 3) * .3).toFixed(1)}s" repeatCount="indefinite" path="${d}"/></circle>`);
+  });
+  svg.innerHTML = out.join("") + `<path id="tmp" class="tmp" d=""/>`;
+  minimap();
 }
 
+// ---- layout / view / minimap
 function layout() {
-  const depth = {}, ids = S.nodes.map(n => n.id);
-  ids.forEach(i => depth[i] = 0);
-  for (let k = 0; k < ids.length; k++) for (const e of S.edges) depth[e.dst] = Math.max(depth[e.dst], depth[e.src] + 1);
-  const cols = {};
-  for (const n of S.nodes) (cols[depth[n.id]] ||= []).push(n);
-  for (const [d, ns] of Object.entries(cols)) ns.forEach((n, j) => { n.x = 40 + d * 285; n.y = 70 + j * 190; });
-  render(); fit();
-}
-
-function addNode(n) { n.id ||= `${n.kind[0]}${Date.now() % 100000}${S.seq++}`; n.x ??= 60 + Math.random() * 200; n.y ??= 80 + Math.random() * 200; S.nodes.push(n); S.sel = n.id; render(); inspect(); }
-
-// ---- interactions
-let drag = null;
-world.addEventListener("mousedown", ev => {
-  const h = ev.target.closest(".nh"); if (!h) return;
-  const n = S.nodes.find(x => x.id === h.parentElement.dataset.id);
-  drag = {n, ox: ev.clientX / S.view.z - n.x, oy: ev.clientY / S.view.z - n.y};
-});
-const mainEl = document.querySelector("main");
-let pan = null;
-mainEl.addEventListener("mousedown", ev => {
-  if (ev.target.closest(".node,.toolbar") || ev.target.closest("path")) return;
-  pan = {x: ev.clientX - S.view.x, y: ev.clientY - S.view.y}; mainEl.classList.add("panning");
-});
-mainEl.addEventListener("wheel", ev => {
-  ev.preventDefault();
-  const r = mainEl.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top;
-  const z = Math.min(2, Math.max(0.3, S.view.z * (ev.deltaY < 0 ? 1.1 : 0.9)));
-  S.view.x = mx - (mx - S.view.x) * z / S.view.z; S.view.y = my - (my - S.view.y) * z / S.view.z; S.view.z = z; applyView();
-}, {passive: false});
-function applyView() { world.style.transform = `translate(${S.view.x}px,${S.view.y}px) scale(${S.view.z})`; }
-function fit() {
-  if (!S.nodes.length) return;
-  const r = mainEl.getBoundingClientRect();
-  const maxX = Math.max(...S.nodes.map(n => n.x + 240)), maxY = Math.max(...S.nodes.map(n => n.y + 200));
-  const minX = Math.min(...S.nodes.map(n => n.x)), minY = Math.min(...S.nodes.map(n => n.y));
-  const z = Math.min(1.1, (r.width - 60) / (maxX - minX), (r.height - 120) / (maxY - minY));
-  S.view = {z, x: (r.width - (maxX - minX) * z) / 2 - minX * z, y: Math.max(64, (r.height - (maxY - minY) * z) / 2) - minY * z}; applyView(); drawEdges();
-}
-window.addEventListener("mousemove", ev => {
-  if (pan) { S.view.x = ev.clientX - pan.x; S.view.y = ev.clientY - pan.y; applyView(); return; }
-  if (!drag) return;
-  drag.n.x = ev.clientX / S.view.z - drag.ox; drag.n.y = ev.clientY / S.view.z - drag.oy;
-  const el = world.querySelector(`.node[data-id="${drag.n.id}"]`); el.style.left = drag.n.x + "px"; el.style.top = drag.n.y + "px";
-  drawEdges();
-});
-window.addEventListener("mouseup", () => { drag = null; pan = null; mainEl.classList.remove("panning"); });
-
-world.addEventListener("click", async ev => {
-  const c = ev.target.closest(".c");
-  if (c) {
-    if (c.dataset.port === "out") { S.pending = {src: c.dataset.node, src_port: c.dataset.name}; world.querySelectorAll(".c.pending").forEach(x => x.classList.remove("pending")); c.classList.add("pending"); return; }
-    if (S.pending) {
-      S.edges = S.edges.filter(e => !(e.dst === c.dataset.node && e.dst_port === c.dataset.name));
-      S.edges.push({...S.pending, dst: c.dataset.node, dst_port: c.dataset.name}); S.pending = null; render(); validate(true);
-    }
-    return;
-  }
-  const p = ev.target.closest("path[data-edge]");
-  if (p) { S.edges.splice(+p.dataset.edge, 1); drawEdges(); return; }
-  const nd = ev.target.closest(".node");
-  if (nd && !ev.target.matches("input,a")) { S.sel = nd.dataset.id; render(); inspect(); }
-});
-svg.addEventListener("click", ev => { const p = ev.target.closest("path[data-edge]"); if (p) { S.edges.splice(+p.dataset.edge, 1); drawEdges(); } });
-
-world.addEventListener("change", ev => {
-  const id = ev.target.dataset.file; if (!id) return;
-  const f = ev.target.files[0]; S.files[id] = f;
-  const n = S.nodes.find(x => x.id === id);
-  if (n && (!n.mime || n.mime === "*/*")) n.mime = guessMime(f.name);
+  S.nodes.forEach(n => { if (!isFinite(n.x)) n.x = 0; if (!isFinite(n.y)) n.y = 0; });
   render();
-});
-function guessMime(name) {
-  const e = name.toLowerCase().split(".").pop();
-  return ({step: "model/step", stp: "model/step", csv: "text/csv", json: "application/json", glb: "model/gltf-binary",
-    html: "text/html", txt: "text/plain", md: "text/markdown", pdf: "application/pdf", png: "image/png"})[e] || "*/*";
+  const depth = {}; S.nodes.forEach(n => depth[n.id] = 0);
+  for (let k = 0; k < S.nodes.length; k++) for (const e of S.edges) depth[e.dst] = Math.max(depth[e.dst] ?? 0, (depth[e.src] ?? 0) + 1);
+  const cols = {}; for (const n of S.nodes) (cols[depth[n.id]] ||= []).push(n);
+  for (const [d, ns] of Object.entries(cols)) { let y = 110; ns.forEach(n => { n.x = 80 + d * 340; n.y = y; y += (S.dims[n.id] ? S.dims[n.id][1] : 160) + 34; }); }
+  render(); fit(); touch();
 }
+function applyView() { world.style.transform = `translate(${S.view.x}px,${S.view.y}px) scale(${S.view.z})`; $("#zPct").textContent = Math.round(S.view.z * 100) + "%"; minimap(); }
+function bounds() {
+  if (!S.nodes.length) return null;
+  const xs = S.nodes.flatMap(n => [n.x, n.x + (S.dims[n.id] || [262])[0]]), ys = S.nodes.flatMap(n => [n.y, n.y + (S.dims[n.id] || [0, 160])[1]]);
+  return {x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys)};
+}
+function fit() {
+  const b = bounds(); if (!b) return; const r = mainEl.getBoundingClientRect();
+  const z = Math.min(1.05, (r.width - 120) / (b.x1 - b.x0), (r.height - 220) / (b.y1 - b.y0));
+  S.view = {z, x: (r.width - (b.x1 - b.x0) * z) / 2 - b.x0 * z, y: Math.max(70, (r.height - 40 - (b.y1 - b.y0) * z) / 2) - b.y0 * z}; applyView(); drawEdges();
+}
+function zoomBy(f) { const r = mainEl.getBoundingClientRect(), mx = r.width / 2, my = r.height / 2, z = Math.min(2, Math.max(0.25, S.view.z * f));
+  S.view.x = mx - (mx - S.view.x) * z / S.view.z; S.view.y = my - (my - S.view.y) * z / S.view.z; S.view.z = z; applyView(); drawEdges(); }
+const MMW = 188, MMH = 118;
+function mmGeom() {
+  const r = mainEl.getBoundingClientRect(), z = S.view.z, vx = -S.view.x / z, vy = -S.view.y / z, vw = r.width / z, vh = r.height / z, b = bounds();
+  const x0 = Math.min(vx, b ? b.x0 : vx) - 60, y0 = Math.min(vy, b ? b.y0 : vy) - 60, x1 = Math.max(vx + vw, b ? b.x1 : vx + vw) + 60, y1 = Math.max(vy + vh, b ? b.y1 : vy + vh) + 60;
+  const s = Math.min(MMW / (x1 - x0), MMH / (y1 - y0)); return {x0, y0, s, ox: (MMW - (x1 - x0) * s) / 2, oy: (MMH - (y1 - y0) * s) / 2, vx, vy, vw, vh};
+}
+function minimap() {
+  if (S.nodes.some(n => !isFinite(n.x) || !isFinite(n.y))) return;
+  const g = mmGeom(), X = x => g.ox + (x - g.x0) * g.s, Y = y => g.oy + (y - g.y0) * g.s;
+  const col = {input: "#5eead4", tool: "#8b90ff", output: "#60a5fa", ai: "#c4a1ff", decide: "#fb923c"};
+  $("#mm").innerHTML = S.edges.map(e => { const a = S.nodes.find(n => n.id === e.src), b = S.nodes.find(n => n.id === e.dst); if (!a || !b) return "";
+      return `<path d="M${X(a.x + (S.dims[a.id] || [262])[0])},${Y(a.y + 24)} L${X(b.x)},${Y(b.y + 24)}" stroke="#555a6b" stroke-width="1" fill="none"/>`; }).join("") +
+    S.nodes.map(n => { const d = S.dims[n.id] || [262, 140]; return `<rect x="${X(n.x)}" y="${Y(n.y)}" width="${Math.max(3, d[0] * g.s)}" height="${Math.max(3, d[1] * g.s)}" rx="2" fill="${col[n.kind]}" opacity="${S.ms.has(n.id) ? 1 : .55}"/>`; }).join("") +
+    `<rect x="${X(g.vx)}" y="${Y(g.vy)}" width="${g.vw * g.s}" height="${g.vh * g.s}" rx="3" fill="#6b70f21a" stroke="#8b90ff" stroke-width="1.2"/>`;
+}
+let mmDrag = false;
+function mmMove(ev) { const bx = $("#mmbox").getBoundingClientRect(), g = mmGeom(), r = mainEl.getBoundingClientRect();
+  const wx = g.x0 + ((ev.clientX - bx.left) - g.ox) / g.s, wy = g.y0 + ((ev.clientY - bx.top) - g.oy) / g.s;
+  S.view.x = r.width / 2 - wx * S.view.z; S.view.y = r.height / 2 - wy * S.view.z; applyView(); drawEdges(); }
+$("#mmbox").addEventListener("mousedown", ev => { mmDrag = true; mmMove(ev); ev.stopPropagation(); });
 
-$("#lib").addEventListener("click", ev => {
-  const it = ev.target.closest(".libitem"); if (!it) return;
-  const m = S.reg[it.dataset.tool];
-  if (m.verification.status !== "verified") {
-    $("#insp").innerHTML = `<h2 style="margin-top:0">${esc(m.id)} · not usable yet</h2>
-      <div class="errs">${esc(m.verification.log)}</div><h2>Node knowledge</h2><div class="md">${window.marked ? marked.parse(m.md || "") : `<pre>${esc(m.md)}</pre>`}</div>`;
-    return;
+// ============================================================ interactions
+let drag = null, pan = null, conn = null, moved = false;
+const toWorld = ev => { const r = mainEl.getBoundingClientRect(); return [(ev.clientX - r.left - S.view.x) / S.view.z, (ev.clientY - r.top - S.view.y) / S.view.z]; };
+function addNode(n, at) {
+  commit(); n.id ||= `${n.kind[0]}${Date.now() % 100000}${S.seq++}`;
+  if (n.x == null) { const r = mainEl.getBoundingClientRect(), c = at || [(r.width / 2 - S.view.x) / S.view.z - 131, (r.height / 2 - S.view.y) / S.view.z - 90]; n.x = c[0] + (S.nodes.length % 4) * 24; n.y = c[1] + (S.nodes.length % 4) * 24; }
+  S.nodes.push(n); S.sel = n.id; render(); inspect();
+}
+const toolNode = m => ({kind: "tool", tool: m.id, backend: "local", params: Object.fromEntries(m.inputs.filter(p => p.kind === "param").map(p => [p.name, p.default || ""]))});
+const blank = k => k === "decide" ? {kind: "decide", question: "Does the report show problems?", options: "problems: mismatches or missing parts\nclean: every row matches"} : k === "input" ? {kind: "input", mime: "*/*", label: "Upload"} : k === "ai" ? {kind: "ai", prompt: "Summarize the input for a buyer", mime: "text/markdown"} : {kind: "output", label: "Output"};
+function delNode(id) { commit(); S.nodes = S.nodes.filter(x => x.id !== id); S.edges = S.edges.filter(e => e.src !== id && e.dst !== id); delete S.files[id]; S.sel = null; S.ms.clear(); S.es.clear(); render(); inspect(); }
+function dupNode(id) { const n = S.nodes.find(x => x.id === id); if (!n) return; const c = JSON.parse(JSON.stringify(n)); c.id = `${n.kind[0]}${Date.now() % 100000}${S.seq++}`; c.x += 36; c.y += 36; commit(); S.nodes.push(c); S.sel = c.id; render(); inspect(); }
+
+const ekey = e => `${e.src}|${e.src_port}|${e.dst}|${e.dst_port}`;
+function updHint() {
+  const n = S.ms.size, e = S.es.size, sel = n > 1 || (!n && e);
+  $("#hintTxt").textContent = n > 1 ? `${n} nodes selected · Ctrl C copy · Ctrl D duplicate · Del delete` : !n && e ? `${e} connection${e > 1 ? "s" : ""} selected · Del removes` : "describe a pipeline or add a node";
+  $("#tHint .kbd").style.display = sel ? "none" : "";
+}
+function paintSel() { world.classList.toggle("multi", S.ms.size > 1); world.querySelectorAll(".node").forEach(el => el.classList.toggle("sel", S.ms.has(el.dataset.id))); drawEdges(); updHint(); }
+function setSel(ids) { S.ms = new Set(ids); S.sel = ids.length === 1 ? ids[0] : null; S.es = new Set(); paintSel(); inspect(); }
+const CLIP_TAG = "constellation/v1";
+function copySel() { if (!S.ms.size) return null; const nodes = S.nodes.filter(n => S.ms.has(n.id)), edges = S.edges.filter(e => S.ms.has(e.src) && S.ms.has(e.dst)); return S.clip = JSON.stringify({tag: CLIP_TAG, nodes, edges}); }
+function pasteGraph(payload, off) {
+  let g; try { g = JSON.parse(payload); } catch (e) { return false; }
+  if (!g || !Array.isArray(g.nodes) || !g.nodes.length || !(g.tag === CLIP_TAG || Array.isArray(g.edges))) return false;
+  if (payload !== S.lastPaste) { S.lastPaste = payload; S.pasteK = 0; }
+  const exist = g.nodes.some(n => S.nodes.some(x => x.id === n.id)), d = off != null ? off : 40 * ((exist ? 1 : 0) + S.pasteK); S.pasteK++;
+  const map = {}, nodes = g.nodes.filter(n => n && n.kind).map(n => { const c = JSON.parse(JSON.stringify(n)); c.id = `${c.kind[0]}${Date.now() % 100000}${S.seq++}`; map[n.id] = c.id; c.x = (+c.x || 0) + d; c.y = (+c.y || 0) + d; return c; });
+  const edges = (g.edges || []).filter(e => map[e.src] && map[e.dst]).map(e => ({...e, src: map[e.src], dst: map[e.dst]}));
+  commit(); S.nodes.push(...nodes); S.edges.push(...edges); S.ms = new Set(nodes.map(n => n.id)); S.sel = nodes.length === 1 ? nodes[0].id : null; S.es = new Set(); render(); inspect();
+  toast(`Pasted ${nodes.length} node${nodes.length > 1 ? "s" : ""}${edges.length ? ` and ${edges.length} connection${edges.length > 1 ? "s" : ""}` : ""}`); return true;
+}
+function deleteSel() {
+  if (!S.ms.size && !S.es.size) return; commit();
+  const ids = new Set(S.ms), ks = new Set(S.es);
+  S.edges = S.edges.filter(e => !ids.has(e.src) && !ids.has(e.dst) && !ks.has(ekey(e))); S.nodes = S.nodes.filter(n => !ids.has(n.id)); ids.forEach(i => delete S.files[i]);
+  S.sel = null; S.ms.clear(); S.es.clear(); render(); inspect();
+}
+function nudge(dx, dy) { if (Date.now() - (S.nudgeT || 0) > 700) commit(); S.nudgeT = Date.now(); S.nodes.filter(n => S.ms.has(n.id)).forEach(n => { n.x += dx; n.y += dy; const el = world.querySelector(`.node[data-id="${n.id}"]`); if (el) { el.style.left = n.x + "px"; el.style.top = n.y + "px"; } }); drawEdges(); touch(); }
+const inField = t => t && t.matches && t.matches("input,textarea,select,[contenteditable]");
+document.addEventListener("copy", e => { if (inField(e.target) || !S.ms.size) return; e.clipboardData.setData("text/plain", copySel()); e.preventDefault(); toast(`Copied ${S.ms.size} node${S.ms.size > 1 ? "s" : ""}`); });
+document.addEventListener("cut", e => { if (inField(e.target) || !S.ms.size) return; e.clipboardData.setData("text/plain", copySel()); e.preventDefault(); deleteSel(); });
+document.addEventListener("paste", e => { if (inField(e.target)) return; const t = e.clipboardData.getData("text/plain"); if (pasteGraph(t || S.clip || "")) e.preventDefault(); });
+
+world.addEventListener("mousedown", ev => {
+  const c = ev.target.closest(".c");
+  if (c && c.dataset.port === "out") {   // drag a wire out of an output port
+    ev.preventDefault(); ev.stopPropagation();
+    const p = portXY(c.dataset.node, "out", c.dataset.name); conn = {src: c.dataset.node, src_port: c.dataset.name, mime: c.dataset.mime, p, x: ev.clientX, y: ev.clientY};
+    document.body.classList.add("connecting");
+    world.querySelectorAll('.c[data-port="in"]').forEach(i => { const sameNode = i.dataset.node === conn.src; i.classList.add(!sameNode && compat(conn.mime, i.dataset.mime) ? "ok" : "no"); }); return;
   }
-  addNode({kind: "tool", tool: m.id, backend: "local", params: Object.fromEntries(m.inputs.filter(p => p.kind === "param").map(p => [p.name, p.default || ""]))});
+  if (ev.target.closest(".ntb,input,label,a,.c,select,textarea,button.tg,.pv,.pw")) return;
+  const nd = ev.target.closest(".node"); if (!nd) return;
+  const n = S.nodes.find(x => x.id === nd.dataset.id);
+  if (S.hand || S.space || ev.button === 1) { ev.preventDefault(); pan = {x: ev.clientX - S.view.x, y: ev.clientY - S.view.y}; mainEl.classList.add("panning"); return; }
+  if (ev.button !== 0) return;
+  if (ev.shiftKey || ev.ctrlKey || ev.metaKey) { const ids = new Set(S.ms); ids.has(n.id) ? ids.delete(n.id) : ids.add(n.id); setSel([...ids]); ev.preventDefault(); return; }
+  if (!S.ms.has(n.id)) setSel([n.id]);
+  const w = toWorld(ev);
+  drag = {w0: w, start: snap(), items: S.nodes.filter(x => S.ms.has(x.id)).map(x => ({n: x, x: x.x, y: x.y, el: world.querySelector(`.node[data-id="${x.id}"]`)}))}; moved = false;
 });
-document.querySelectorAll("[data-add]").forEach(b => b.onclick = () => {
-  const k = b.dataset.add;
-  addNode(k === "decide" ? {kind: "decide", question: "Does the report show problems?", options: "problems: mismatches or missing parts\nclean: every row matches"} : k === "input" ? {kind: "input", mime: "*/*", label: "Upload"} : k === "ai" ? {kind: "ai", prompt: "Summarize the input for a buyer", mime: "text/markdown"} : {kind: "output", label: "Output"});
+let marq = null;
+mainEl.addEventListener("mousedown", ev => {
+  if (ev.target.closest(".node,.top,.dock,.mm,#insp,#qa,#runlog,.status,.menu,.zoom,#empty .box,#tHint,path[data-edge]")) return;
+  if (S.hand || S.space || ev.button === 1) { ev.preventDefault(); pan = {x: ev.clientX - S.view.x, y: ev.clientY - S.view.y}; mainEl.classList.add("panning"); return; }
+  if (ev.button !== 0) return;
+  marq = {x0: ev.clientX, y0: ev.clientY, add: ev.shiftKey || ev.ctrlKey || ev.metaKey, base: new Set(S.ms), moved: false};
+});
+mainEl.addEventListener("wheel", ev => { if (ev.target.closest("#insp,#runlog,#qa")) return; ev.preventDefault();
+  const r = mainEl.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top, z = Math.min(2, Math.max(0.25, S.view.z * (ev.deltaY < 0 ? 1.08 : 0.925)));
+  S.view.x = mx - (mx - S.view.x) * z / S.view.z; S.view.y = my - (my - S.view.y) * z / S.view.z; S.view.z = z; applyView(); drawEdges(); }, {passive: false});
+window.addEventListener("mousemove", ev => {
+  if (mmDrag) return mmMove(ev);
+  if (conn) { const r = mainEl.getBoundingClientRect(), q = [(ev.clientX - r.left - S.view.x) / S.view.z, (ev.clientY - r.top - S.view.y) / S.view.z]; $("#tmp").setAttribute("d", curve(conn.p, q)); return; }
+  if (pan) { S.view.x = ev.clientX - pan.x; S.view.y = ev.clientY - pan.y; applyView(); return; }
+  if (marq) {
+    if (!marq.moved && Math.hypot(ev.clientX - marq.x0, ev.clientY - marq.y0) < 4) return;
+    marq.moved = true; const r = mainEl.getBoundingClientRect(), m = $("#marq");
+    const x0 = Math.min(marq.x0, ev.clientX), x1 = Math.max(marq.x0, ev.clientX), y0 = Math.min(marq.y0, ev.clientY), y1 = Math.max(marq.y0, ev.clientY);
+    Object.assign(m.style, {display: "block", left: x0 - r.left + "px", top: y0 - r.top + "px", width: x1 - x0 + "px", height: y1 - y0 + "px"});
+    const z = S.view.z, wx0 = (x0 - r.left - S.view.x) / z, wx1 = (x1 - r.left - S.view.x) / z, wy0 = (y0 - r.top - S.view.y) / z, wy1 = (y1 - r.top - S.view.y) / z;
+    const hit = S.nodes.filter(n => { const d = S.dims[n.id] || [262, 140]; return n.x < wx1 && n.x + d[0] > wx0 && n.y < wy1 && n.y + d[1] > wy0; }).map(n => n.id);
+    S.ms = new Set(marq.add ? [...marq.base, ...hit] : hit); S.sel = null; S.es = new Set(); paintSel(); return;
+  }
+  if (!drag) return;
+  const w = toWorld(ev), dx = w[0] - drag.w0[0], dy = w[1] - drag.w0[1]; if (!moved && Math.hypot(dx, dy) < 3) return;
+  if (!moved) { moved = true; S.hist.push(drag.start); S.redo = []; updUndo(); }
+  drag.items.forEach(it => { it.n.x = it.x + dx; it.n.y = it.y + dy; if (it.el) { it.el.style.left = it.n.x + "px"; it.el.style.top = it.n.y + "px"; } }); drawEdges();
+});
+window.addEventListener("mouseup", ev => {
+  mmDrag = false;
+  if (marq) { const m = marq; marq = null; $("#marq").style.display = "none"; if (m.moved) setSel([...S.ms]); else if (!m.add) { S.pending = null; setSel([]); } return; }
+  if (conn) {
+    const dropped = document.elementFromPoint(ev.clientX, ev.clientY), t = dropped && dropped.closest(".c[data-port=in]"), far = Math.hypot(ev.clientX - conn.x, ev.clientY - conn.y) > 5;
+    document.body.classList.remove("connecting"); world.querySelectorAll(".c.ok,.c.no").forEach(x => x.classList.remove("ok", "no"));
+    if (t && t.dataset.node !== conn.src) connect(conn.src, conn.src_port, t.dataset.node, t.dataset.name);
+    else if (!far) { S.pending = {src: conn.src, src_port: conn.src_port}; world.querySelectorAll(".c.pending").forEach(x => x.classList.remove("pending")); const c = world.querySelector(`.c[data-node="${conn.src}"][data-port="out"][data-name="${CSS.escape(conn.src_port)}"]`); c && c.classList.add("pending"); }
+    conn = null; drawEdges(); return;
+  }
+  if (drag && moved) { touch(); S.justDragged = true; setTimeout(() => S.justDragged = false, 0); }
+  drag = null; pan = null; mainEl.classList.remove("panning");
+});
+function connect(src, sp, dst, dp) {
+  commit(); S.edges = S.edges.filter(e => !(e.dst === dst && e.dst_port === dp)); S.edges.push({src, src_port: sp, dst, dst_port: dp}); S.pending = null; render(); validate(true);
+}
+world.addEventListener("click", ev => {
+  if (S.justDragged) return;
+  const c = ev.target.closest(".c");
+  if (c && c.dataset.port === "in" && S.pending) { connect(S.pending.src, S.pending.src_port, c.dataset.node, c.dataset.name); return; }
+  const tg = ev.target.closest("[data-tg]");
+  if (tg) { const n = S.nodes.find(x => x.id === tg.closest(".node").dataset.id), on = !tg.classList.contains("on"); tg.classList.toggle("on", on); (n.params ||= {})[tg.dataset.tg] = String(on); touch(); return; }
+  const act = ev.target.closest("[data-act]");
+  if (act) { const id = act.closest(".node").dataset.id; ({del: () => delNode(id), dup: () => dupNode(id), edit: () => { setSel([id]); inspect(true); }})[act.dataset.act](); return; }
+  const nd = ev.target.closest(".node");
+  if (nd && !ev.target.closest("input,a,label,select,textarea,.pw,.pv")) { if (ev.shiftKey || ev.ctrlKey || ev.metaKey) return; setSel([nd.dataset.id]); }
+});
+svg.addEventListener("click", ev => { const p = ev.target.closest("path[data-edge]"); if (!p) return; const e = S.edges[+p.dataset.edge]; if (!e) return;
+  const k = ekey(e), add = ev.shiftKey || ev.ctrlKey || ev.metaKey, es = add ? new Set(S.es) : new Set();
+  es.has(k) ? es.delete(k) : es.add(k); S.ms = add ? S.ms : new Set(); S.sel = null; S.es = es; paintSel(); inspect(); });
+svg.addEventListener("dblclick", ev => { const p = ev.target.closest("path[data-edge]"); if (p) { commit(); S.edges.splice(+p.dataset.edge, 1); S.es.clear(); render(); } });
+world.addEventListener("change", ev => {
+  const t = ev.target, id = t.dataset.file; if (id) { setFile(id, t.files[0]); return; }
+  if (t.dataset.k) { const n = S.nodes.find(x => x.id === t.closest(".node").dataset.id); commit(); n[t.dataset.k] = t.value; render(); }
+});
+world.addEventListener("input", ev => {
+  const t = ev.target; if (!t.dataset.p) return; const n = S.nodes.find(x => x.id === t.closest(".node").dataset.id);
+  (n.params ||= {})[t.dataset.p] = t.value; touch();
+  const c = t.closest(".c");
+  if (t.type === "color") { const hx = c.querySelector("[data-hex]"); if (hx) hx.value = t.value; }
+  else if (t.dataset.hex !== undefined && /^#[0-9a-f]{6}$/i.test(t.value)) c.querySelector("input[type=color]").value = t.value;
+  else if (t.type === "range") { const rv = c.querySelector(".rv"); if (rv) rv.textContent = t.value; }
+});
+function guessMime(name) { const e = name.toLowerCase().split(".").pop();
+  return ({step: "model/step", stp: "model/step", csv: "text/csv", json: "application/json", glb: "model/gltf-binary", html: "text/html", txt: "text/plain", md: "text/markdown", pdf: "application/pdf", png: "image/png", svg: "image/svg+xml", cgm: "image/cgm", jpg: "image/jpeg", jpeg: "image/jpeg", stl: "model/stl", obj: "model/obj", gltf: "model/gltf+json", gif: "image/gif", webp: "image/webp"})[e] || "*/*"; }
+function setFile(id, f) { if (!f) return; S.files[id] = f; const n = S.nodes.find(x => x.id === id);
+  if (n && (!n.mime || n.mime === "*/*")) n.mime = guessMime(f.name); render(); touch(); }
+
+// drop files onto an Upload node; drop library templates onto the canvas
+mainEl.addEventListener("dragover", ev => { ev.preventDefault(); const dz = ev.target.closest(".dz"); document.querySelectorAll(".dz.over").forEach(x => x !== dz && x.classList.remove("over")); dz ? dz.classList.add("over") : document.body.classList.add("drop"); });
+mainEl.addEventListener("dragleave", ev => { document.body.classList.remove("drop"); const dz = ev.target.closest && ev.target.closest(".dz"); dz && dz.classList.remove("over"); });
+mainEl.addEventListener("drop", ev => {
+  ev.preventDefault(); document.body.classList.remove("drop");
+  const dz = ev.target.closest(".dz"); if (dz && ev.dataTransfer.files[0]) { setFile(dz.dataset.drop, ev.dataTransfer.files[0]); return; }
+  const id = ev.dataTransfer.getData("text/tool"), m = S.reg[id]; if (!m || m.verification.status !== "verified") return;
+  const w = toWorld(ev); addNode({...toolNode(m), x: w[0] - 131, y: w[1] - 40});
+});
+$("#lib").addEventListener("dragstart", ev => { const it = ev.target.closest(".tpl"); if (it) ev.dataTransfer.setData("text/tool", it.dataset.tool); });
+$("#lib").addEventListener("click", ev => {
+  const it = ev.target.closest(".tpl"); if (!it) return; const m = S.reg[it.dataset.tool];
+  if (m.verification.status !== "verified") { openInsp(`<h2>${esc(m.id)} · not usable yet</h2><div class="errs">${esc(m.verification.log)}</div><h2>Node knowledge</h2><div class="md">${window.marked ? marked.parse(m.md || "") : `<pre>${esc(m.md)}</pre>`}</div>`); return; }
+  addNode(toolNode(m));
+});
+document.querySelectorAll("[data-add]").forEach(b => b.onclick = () => addNode(blank(b.dataset.add)));
+
+// ---- dock, menu, quick add
+$("#tSel").onclick = () => { S.hand = false; $("#tSel").classList.add("on"); $("#tHand").classList.remove("on"); mainEl.classList.remove("hand"); };
+$("#tHand").onclick = () => { S.hand = true; $("#tHand").classList.add("on"); $("#tSel").classList.remove("on"); mainEl.classList.add("hand"); };
+$("#tUndo").onclick = undo; $("#tRedo").onclick = redo;
+$("#zIn").onclick = () => zoomBy(1.18); $("#zOut").onclick = () => zoomBy(1 / 1.18); $("#zFit").onclick = fit; 
+$("#moreBtn").onclick = ev => { ev.stopPropagation(); $("#menu").classList.toggle("open"); };
+document.addEventListener("click", ev => { if (!ev.target.closest("#menu,#moreBtn")) $("#menu").classList.remove("open"); if (!ev.target.closest("#qa,#tHint")) $("#qa").classList.remove("open"); });
+$("#menu").onclick = ev => { const b = ev.target.closest("[data-m]"); if (!b) return; $("#menu").classList.remove("open");
+  ({layout, fit, clear: () => { commit(); S.nodes = []; S.edges = []; S.results = {}; S.files = {}; S.sel = null; S.ms.clear(); S.es.clear(); render(); inspect(); },
+    export: () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({name: S.name, ...graphJSON(true)}, null, 2)], {type: "application/json"})); a.download = (S.name || "pipeline").replace(/\W+/g, "-") + ".json"; a.click(); },
+    import: () => $("#impFile").click()})[b.dataset.m](); };
+$("#impFile").onchange = async ev => { try { const g = JSON.parse(await ev.target.files[0].text()); commit(); S.nodes = g.nodes.map((n, i) => ({x: 80 + (i % 4) * 300, y: 120 + Math.floor(i / 4) * 220, ...n})); S.edges = g.edges || []; S.name = g.name || S.name; $("#pname").value = S.name; S.results = {}; render(); fit(); toast("Pipeline imported", "ok"); } catch (e) { toast("Not a valid pipeline file: " + e.message, "bad"); } ev.target.value = ""; };
+$("#pname").oninput = e => { S.name = e.target.value; touch(); };
+$("#logBtn").onclick = () => toggleLog(); $("#rlClose").onclick = () => toggleLog(false);
+$("#codeBtn").onclick = () => openInsp(`<h2>Pipeline JSON</h2><pre class="log tall">${esc(JSON.stringify(graphJSON(), null, 2))}</pre>`);
+function toggleLog(on) { const el = $("#runlog"), open = on ?? !el.classList.contains("open"); el.classList.toggle("open", open); if (open) renderLog(); }
+function renderLog() {
+  $("#rlBody").innerHTML = Object.keys(S.results).length ? S.nodes.filter(n => S.results[n.id]).map(n => { const r = S.results[n.id];
+    return `<div class="ln"><b>${esc(title(n))}</b> <span class="${r.status === "done" ? "ok" : r.status === "failed" ? "bad" : ""}">${esc(r.status)}</span>${r.seconds != null ? ` · ${r.seconds}s` : ""}\n${esc((r.errors || []).join("\n") || r.log || "")}</div>`; }).join("") : "Nothing has run yet. Press Run.";
+}
+function togglePanel(force) {
+  const a = $("#app"), hide = force ?? !a.classList.contains("nopanel"); a.classList.toggle("nopanel", hide);
+  document.querySelectorAll(".rb[data-tab]").forEach(b => b.classList.toggle("on", !hide && b.dataset.tab === Q.tab));
+  try { localStorage.setItem("constellation.panel", hide ? "0" : "1"); } catch (e) { /* ignore */ }
+  setTimeout(drawEdges, 280);
+}
+$("#pTog").onclick = () => togglePanel();
+const CMD = () => [
+  {n: "Run pipeline", s: "Ctrl ↵", i: "play", run: () => $("#runBtn").click()}, {n: "Validate graph", i: "check", run: () => $("#valBtn").click()},
+  {n: "Auto-layout", i: "layout", run: layout}, {n: "Fit to view", s: "F", i: "fit", run: fit},
+  {n: "Undo", s: "Ctrl Z", i: "undo", run: undo}, {n: "Redo", s: "Ctrl ⇧ Z", i: "redo", run: redo},
+  {n: "Toggle side panel", s: "Ctrl B", i: "sidebar", run: () => togglePanel()},
+  {n: "Open node library", i: "search", run: () => setTab("lib")}, {n: "Add tools: scan a repo", i: "plus", run: () => setTab("add")},
+  {n: "AI settings", i: "gear", run: () => $("#setDlg").showModal()}, {n: "Toggle run log", i: "term", run: () => toggleLog()},
+  {n: "Export pipeline JSON", i: "down", run: () => $('#menu [data-m="export"]').click()}, {n: "Clear canvas", i: "trash", run: () => $('#menu [data-m="clear"]').click()}];
+function buildFrom(t) { $("#ask").value = t; $("#planBtn").click(); }
+function qaItems(q) {
+  const t = q.trim(), words = t.split(/\s+/).filter(Boolean), match = x => !t || words.every(w => (x.n + " " + (x.s || "")).toLowerCase().includes(w.toLowerCase()));
+  const base = [["input", "Upload", "a file you provide"], ["output", "Output", "a result to keep"], ["ai", "AI step", "a model does it"], ["decide", "Decision", "route by meaning"]]
+    .map(([k, n, s]) => ({g: "Add node", kind: k, n, s, run: () => addNode(blank(k))}));
+  const tools = searchNodes(Object.values(S.reg).filter(m => m.verification.status === "verified"), t)
+    .map(r => ({g: "Add node", kind: "tool", n: r.m.id, s: r.why && t ? r.why : (r.m.outputs[0] ? "→ " + short(r.m.outputs[0].mime) : ""), run: () => addNode(toolNode(r.m))}));
+  const nodes = [...base.filter(match), ...tools].slice(0, t ? 8 : 12), cmds = CMD().map(c => ({g: "Commands", kind: "cmd", ...c})).filter(match).slice(0, t ? 5 : 20);
+  const build = t ? [{g: "Ask AI", kind: "build", n: `Build pipeline: “${t}”`, s: "⇧ ↵", run: () => buildFrom(t)}] : [];
+  return t && (words.length >= 3 || (!nodes.length && !cmds.length)) ? [...build, ...nodes, ...cmds] : [...nodes, ...cmds, ...build];
+}
+function fillQA(q) {
+  S.qa = qaItems(q); S.qaI = 0; let last = "";
+  $("#qaList").innerHTML = S.qa.map((x, i) => {
+    const gh = x.g !== last ? (last = x.g, `<div class="gh">${x.g}</div>`) : "", col = x.kind === "build" ? "var(--accent2)" : x.kind === "cmd" ? "var(--dim)" : KC[x.kind], ic = x.kind === "build" ? "spark" : x.kind === "cmd" ? x.i : KICON[x.kind];
+    return gh + `<div class="it ${i === 0 ? "act" : ""} ${x.kind === "build" ? "build" : ""}" data-qi="${i}" style="--kc:${col}"><span class="ic">${icon(ic)}</span><span class="nm">${esc(x.n)}</span><small>${esc(x.s || "")}</small></div>`;
+  }).join("") || `<div class="hint" style="padding:14px">No match. Press ⇧ ↵ to build a pipeline from this text.</div>`;
+}
+const closeQA = () => { $("#qa").classList.remove("open"); mainEl.focus && 0; };
+function openQA(pre) { $("#qa").classList.add("open"); const i = $("#qaIn"); i.value = pre || ""; i.focus(); fillQA(i.value); }
+$("#tHint").onclick = ev => { ev.stopPropagation(); $("#qa").classList.contains("open") ? closeQA() : openQA(); };
+$("#qaIn").oninput = e => fillQA(e.target.value);
+$("#qaList").onclick = ev => { const it = ev.target.closest(".it"); if (it) { const x = S.qa[+it.dataset.qi]; closeQA(); x.run(); } };
+$("#qaIn").onkeydown = ev => {
+  const items = [...document.querySelectorAll("#qaList .it")];
+  if (ev.key === "ArrowDown" || ev.key === "ArrowUp" || ev.key === "Tab") { ev.preventDefault(); const d = ev.key === "ArrowUp" || (ev.key === "Tab" && ev.shiftKey) ? -1 : 1; S.qaI = (S.qaI + d + items.length) % Math.max(1, items.length); items.forEach((x, i) => x.classList.toggle("act", i === S.qaI)); items[S.qaI] && items[S.qaI].scrollIntoView({block: "nearest"}); return; }
+  if (ev.key === "Enter") { ev.preventDefault(); ev.stopPropagation(); const v = ev.target.value.trim();
+    if (ev.shiftKey) { if (v) { closeQA(); buildFrom(v); } return; }
+    const x = S.qa[S.qaI]; if (x) { closeQA(); x.run(); } return; }
+  if (ev.key === "Escape") { ev.stopPropagation(); closeQA(); }
+};
+document.addEventListener("keyup", e => { if (e.key === " " && S.space) { S.space = false; mainEl.classList.toggle("hand", S.hand); } });
+document.addEventListener("keydown", e => {
+  const typing = e.target.matches("input,textarea,select");
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openQA(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") { e.preventDefault(); togglePanel(); return; }
+  if (e.shiftKey && e.key === "Enter" && !e.ctrlKey && !e.target.matches("select,#qaIn")) { e.preventDefault(); if (e.target.id === "ask" && e.target.value.trim()) buildFrom(e.target.value.trim()); else openQA(e.target.id === "ask" ? "" : ""); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); (Q.tab === "build" && typing && e.target.id === "ask") ? $("#planBtn").click() : $("#runBtn").click(); return; }
+  if (typing) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+  if (mod && k === "y") { e.preventDefault(); redo(); return; }
+  if (mod && k === "a") { e.preventDefault(); setSel(S.nodes.map(n => n.id)); return; }
+  if (mod && k === "d") { e.preventDefault(); const p = copySel(); if (p) pasteGraph(p, 36); return; }
+  if (e.key === "/") { e.preventDefault(); openQA(); return; }
+  if (e.key === " ") { e.preventDefault(); if (!S.space) { S.space = true; mainEl.classList.add("hand"); } return; }
+  if ((e.key === "Delete" || e.key === "Backspace") && (S.ms.size || S.es.size)) { e.preventDefault(); deleteSel(); return; }
+  if (/^Arrow/.test(e.key) && S.ms.size) { e.preventDefault(); const st = e.shiftKey ? 10 : 1; nudge({ArrowLeft: -st, ArrowRight: st}[e.key] || 0, {ArrowUp: -st, ArrowDown: st}[e.key] || 0); return; }
+  if (!mod) { if (k === "f") fit(); if (k === "v") $("#tSel").click(); if (k === "h") $("#tHand").click(); }
+  if (e.key === "Escape") { S.pending = null; S.sel = null; S.ms.clear(); S.es.clear(); render(); inspect(); toggleLog(false); closeQA(); }
 });
 
-// ---- inspector
-function inspect() {
+// ============================================================ inspector
+function openInsp(html) { const I = $("#insp"); I.innerHTML = `<button class="x" id="inspX">${icon("close")}</button>` + html; I.classList.add("open"); $("#inspX").onclick = () => { I.classList.remove("open"); I.dataset.for = ""; S.sel = null; S.ms.clear(); S.es.clear(); render(); }; return I; }
+function inspect(force) {
   const n = S.nodes.find(x => x.id === S.sel), I = $("#insp");
-  if (!n) { I.innerHTML = `<h2 style="margin-top:0">Inspector</h2><div class="hint">Click a node.</div>`; return; }
+  if (!n) { if (I.dataset.for) { I.classList.remove("open"); I.dataset.for = ""; } return; }
+  if (!force && I.dataset.for === n.id && I.classList.contains("open") && I.contains(document.activeElement)) return;
   const res = S.results[n.id];
-  let h = `<h2 style="margin-top:0">${esc(n.kind)} · ${esc(n.id)}</h2><div class="row"><button class="btn" id="delNode">Delete node</button></div>`;
+  let h = `<h2>${esc(n.kind)} · ${esc(n.id)}</h2>`;
   if (n.kind === "input") h += `<label class="f">Label</label><input type="text" data-k="label" value="${esc(n.label)}"><label class="f">Type</label><input type="text" data-k="mime" value="${esc(n.mime)}">`;
   if (n.kind === "output") h += `<label class="f">Label</label><input type="text" data-k="label" value="${esc(n.label)}">`;
-  if (n.kind === "decide") h += `<label class="f">Question</label><textarea data-k="question">${esc(n.question)}</textarea>
-    <label class="f">Options, one per line: <code>name: what it means</code></label><textarea data-k="options" style="min-height:90px">${esc(typeof n.options === "string" ? n.options : Object.entries(n.options || {}).map(([k, v]) => k + ": " + v).join("\n"))}</textarea>
-    <div class="hint">The input file is routed, unchanged, to the chosen option's port. Branches not taken are skipped. Decided by the decision engine (Laya / LLM / heuristic, see AI settings).</div>`;
-  if (n.kind === "ai") h += `<label class="f">Prompt</label><textarea data-k="prompt">${esc(n.prompt)}</textarea><label class="f">Output type</label>
-    <select data-k="mime">${["text/markdown", "application/json", "text/html", "text/csv"].map(m => `<option ${m === n.mime ? "selected" : ""}>${m}</option>`).join("")}</select>
-    <div class="hint">Routes this step to the configured LLM instead of a tool.</div>`;
+  if (n.kind === "decide") h += `<label class="f">Question</label><textarea data-k="question">${esc(n.question)}</textarea><label class="f">Options, one per line: <code>name: what it means</code></label><textarea data-k="options" style="min-height:90px">${esc(typeof n.options === "string" ? n.options : Object.entries(n.options || {}).map(([k, v]) => k + ": " + v).join("\n"))}</textarea>
+    <div class="hint">The input is routed, unchanged, to the chosen option's port. Branches not taken are skipped.</div>`;
+  if (n.kind === "ai") h += `<label class="f">Prompt</label><textarea data-k="prompt">${esc(n.prompt)}</textarea><label class="f">Model</label><select data-k="model">${modelOpts(n.model)}</select><label class="f">Output type</label><select data-k="mime">${MIMEOPTS.map(([v, l]) => `<option value="${v}" ${v === n.mime ? "selected" : ""}>${l}</option>`).join("")}</select><div class="hint">Routes this step to the configured LLM instead of a tool.</div>`;
   if (n.kind === "tool") {
-    const m = S.reg[n.tool];
+    const m = S.reg[n.tool] || {inputs: [], md: ""};
     h += `<label class="f">Run on</label><select data-k="backend">${["local", "docker", "remote"].map(b => `<option ${b === (n.backend || "local") ? "selected" : ""}>${b}</option>`).join("")}</select>`;
     if (n.backend === "remote") h += `<label class="f">Worker URL</label><input type="text" data-k="remote_url" value="${esc(n.remote_url || "")}" placeholder="http://gpu-box:8800">`;
     const ps = m.inputs.filter(p => p.kind === "param");
-    if (ps.length) h += `<label class="f">Parameters</label>` + ps.map(p => `<label class="f">${esc(p.name)}${p.required ? " *" : ""}</label><input type="text" data-param="${esc(p.name)}" value="${esc((n.params || {})[p.name] ?? "")}" placeholder="${esc(p.description)}">`).join("");
+    if (ps.length) h += `<h2>Parameters</h2>` + ps.map(p => `<label class="f">${esc(p.name)}${p.required ? " *" : ""}</label><input type="text" data-param="${esc(p.name)}" value="${esc((n.params || {})[p.name] ?? "")}" placeholder="${esc(p.description)}">`).join("");
     h += `<div class="itabs"><button data-itab="d" class="${S.itab !== "s" ? "on" : ""}">Node knowledge</button><button data-itab="s" class="${S.itab === "s" ? "on" : ""}">Skill (for LLMs)</button></div>
       <div id="itabBody">${S.itab === "s" ? `<div class="hint">loading…</div>` : `<div class="md">${window.marked ? marked.parse(m.md || "") : `<pre>${esc(m.md)}</pre>`}</div>`}</div>`;
   }
@@ -483,190 +1033,159 @@ function inspect() {
     for (const [port, url] of Object.entries(res.urls || {})) {
       h += `<div class="row"><a class="outlink" target="_blank" href="${url}">${esc(port)}: ${esc(url.split("/").pop())}</a></div>`;
       if (/\.glb$/i.test(url)) h += `<model-viewer src="${url}" camera-controls auto-rotate></model-viewer>`;
+      else if (IMG.test(url)) h += `<img class="preview" style="object-fit:contain" src="${url}" alt="">`;
       else if (/\.html?$/i.test(url)) h += `<iframe class="preview" src="${url}"></iframe>`;
       else if (/\.(json|csv|md|txt)$/i.test(url)) h += `<pre class="log" data-src="${url}">loading…</pre>`;
     }
     if (res.log) h += `<h2>Log</h2><div class="log">${esc(res.log)}</div>`;
   }
-  I.innerHTML = h;
-  if (n.kind === "tool") {
-    I.querySelectorAll("[data-itab]").forEach(b => b.onclick = () => { S.itab = b.dataset.itab; inspect(); });
-    if (S.itab === "s") loadSkill(n.tool, I.querySelector("#itabBody"));
-  }
+  openInsp(h); I.dataset.for = n.id;
+  if (n.kind === "tool") { I.querySelectorAll("[data-itab]").forEach(b => b.onclick = () => { S.itab = b.dataset.itab; inspect(true); }); if (S.itab === "s") loadSkill(n.tool, I.querySelector("#itabBody")); }
   I.querySelectorAll("pre[data-src]").forEach(async p => { p.textContent = (await (await fetch(p.dataset.src)).text()).slice(0, 4000); });
-  I.querySelector("#delNode").onclick = () => { S.nodes = S.nodes.filter(x => x.id !== n.id); S.edges = S.edges.filter(e => e.src !== n.id && e.dst !== n.id); S.sel = null; render(); inspect(); };
-  I.querySelectorAll("[data-k]").forEach(el => el.onchange = () => { n[el.dataset.k] = el.value; render(); if (el.dataset.k === "backend") inspect(); });
-  I.querySelectorAll("[data-param]").forEach(el => el.onchange = () => { (n.params ||= {})[el.dataset.param] = el.value; });
+  I.querySelectorAll("[data-k]").forEach(el => el.onchange = () => { commit(); n[el.dataset.k] = el.value; render(); if (el.dataset.k === "backend") inspect(true); });
+  I.querySelectorAll("[data-param]").forEach(el => el.onchange = () => { (n.params ||= {})[el.dataset.param] = el.value; touch(); });
 }
 
-// ---- actions
-function graphJSON() { return {nodes: S.nodes.map(({x, y, ...r}) => r), edges: S.edges}; }
-
+// ============================================================ actions: validate / plan / run
+function graphJSON(withPos) { return {nodes: S.nodes.map(({x, y, ...r}) => withPos ? {x, y, ...r} : r), edges: S.edges}; }
 async function validate(quiet) {
   const {errors} = await api("/api/validate", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify(graphJSON())});
-  $("#planNote").innerHTML = errors.length ? `<div class="errs">${esc(errors.join("\n"))}</div>` : (quiet ? "" : `<span style="color:var(--ok)">Graph is valid.</span>`);
-  return errors;
+  $("#planNote").innerHTML = errors.length ? `<div class="errs">${esc(errors.join("\n"))}</div>` : (quiet ? "" : `<span class="ok">Graph is valid.</span>`); return errors;
 }
-
+$("#valBtn").onclick = async () => { const e = await validate(false); toast(e.length ? e.length + " problem(s) in the graph" : "Graph is valid", e.length ? "bad" : "ok"); };
+$("#exChips").onclick = ev => { const c = ev.target.closest(".chip"); if (!c) return; $("#ask").value = c.textContent; $("#planBtn").click(); };
 $("#planBtn").onclick = async () => {
-  $("#planNote").textContent = "planning…";
+  $("#planNote").textContent = "planning…"; const b = $("#planBtn"); b.disabled = true; $("#prog").classList.add("on"); $("#stMsg").textContent = "Planning your pipeline…";
   try {
-    const {graph, errors} = await api("/api/plan", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({request: $("#ask").value})});
-    S.nodes = graph.nodes; S.edges = graph.edges; S.results = {}; S.files = {}; S.sel = null;
+    const {graph, errors, synced} = await api("/api/plan", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({request: $("#ask").value})});
+    if (synced) { loadReg(); toast("Searched your tool sources" + (synced.some(s => (s.new || []).length) ? " and added new nodes" : ""), "ok"); }
+    commit(); S.nodes = graph.nodes; S.edges = graph.edges; S.results = {}; S.files = {}; S.sel = null; S.ms.clear(); S.es.clear(); S.lastRun = null;
+    if (S.name === "Untitled pipeline") { S.name = $("#ask").value.slice(0, 40); $("#pname").value = S.name; }
     layout(); inspect();
+    toast(errors.length ? "Pipeline built, but check the graph: " + errors[0].slice(0, 80) : `Pipeline ready: ${graph.nodes.length} nodes (${graph.planner})`, errors.length ? "bad" : "ok");
     $("#planNote").innerHTML = `Planned by <b>${esc(graph.planner)}</b>. ${graph.note ? esc(graph.note) : ""}` +
       (graph.decisions || []).map(d => `<div class="dec">${esc(d.question)} → <b>${esc(d.choice)}</b> (${esc(d.backend)}, ${(+d.confidence).toFixed(2)})${d.used ? "" : " · not confident, kept " + esc(d.kept)}</div>`).join("") + (errors.length ? `<div class="errs">${esc(errors.join("\n"))}</div>` : " Upload the inputs, then Run.");
-  } catch (e) { $("#planNote").innerHTML = `<div class="errs">${esc(e.message)}</div>`; }
+  } catch (e) { $("#planNote").innerHTML = `<div class="errs">${esc(e.message)}</div>`; toast("Planning failed: " + e.message.slice(0, 100), "bad"); } finally { b.disabled = false; $("#prog").classList.remove("on"); statusBar(); }
 };
-
 $("#runBtn").onclick = async () => {
-  if ((await validate(true)).length) return;
-  const fd = new FormData();
-  fd.append("graph", JSON.stringify(graphJSON()));
+  if (S.running) return;
+  if (!S.nodes.length) { toast("Nothing to run yet. Describe a pipeline first.", "bad"); return; }
+  if ((await validate(true)).length) { toast("Fix the graph first: " + $("#planNote").textContent.slice(0, 90), "bad"); return; }
+  const fd = new FormData(); fd.append("graph", JSON.stringify(graphJSON()));
   for (const [id, f] of Object.entries(S.files)) if (S.nodes.some(n => n.id === id)) fd.append("file:" + id, f);
-  S.results = {}; S.nodes.forEach(n => S.results[n.id] = {status: "running"}); render();
-  $("#status").textContent = "running…";
+  S.results = {}; S.nodes.forEach(n => S.results[n.id] = {status: "running"}); S.running = true; $("#prog").classList.add("on"); statusBar(); render();
   try {
-    const r = await api("/api/run", {method: "POST", body: fd});
-    S.results = r.nodes || {};
+    const r = await api("/api/run", {method: "POST", body: fd}); S.results = r.nodes || {};
     if (r.errors) $("#planNote").innerHTML = `<div class="errs">${esc(r.errors.join("\n"))}</div>`;
-    $("#status").textContent = r.ok ? `run ${r.run}: all nodes done` : `run ${r.run || ""}: some nodes failed`;
-    const firstOut = [...S.nodes].reverse().find(n => n.kind === "output" && S.results[n.id] && S.results[n.id].status === "done");
-    if (firstOut) S.sel = firstOut.id;
-  } catch (e) { $("#status").textContent = "run error"; $("#planNote").innerHTML = `<div class="errs">${esc(e.message)}</div>`; S.results = {}; }
-  render(); inspect();
+    S.lastRun = {id: r.run || "", ok: !!r.ok}; S.dirty = false;
+    toast(r.ok ? "Pipeline finished: every node done" : "Some nodes failed. Click a node to see why.", r.ok ? "ok" : "bad");
+    const firstOut = [...S.nodes].reverse().find(n => n.kind === "output" && S.results[n.id] && S.results[n.id].status === "done"); if (firstOut) S.sel = firstOut.id;
+  } catch (e) { toast("Run error: " + e.message.slice(0, 120), "bad"); S.results = {}; }
+  S.running = false; $("#prog").classList.remove("on"); statusBar(); render(); inspect(true); if ($("#runlog").classList.contains("open")) renderLog();
 };
-$("#valBtn").onclick = () => validate(false);
-$("#layoutBtn").onclick = layout;
-$("#fitBtn").onclick = fit;
-$("#clearBtn").onclick = () => { S.nodes = []; S.edges = []; S.results = {}; S.files = {}; S.sel = null; render(); inspect(); };
 
-$("#obBtn").onclick = async () => {
-  if ($("#obBtn").disabled) return;
-  $("#obBtn").disabled = true; $("#obBtn").textContent = "Analyzing…";
-  try { await onboardNow(); } finally { $("#obBtn").disabled = false; $("#obBtn").textContent = "Analyze & verify"; }
-};
-async function onboardNow() {
-  const fd = new FormData();
-  fd.append("path", $("#obPath").value);
-  if ($("#obZip").files[0]) fd.append("archive", $("#obZip").files[0]);
-  $("#insp").innerHTML = `<h2 style="margin-top:0">Onboarding</h2><div class="log">analyzing, building, running on samples…</div>`;
-  try {
-    const r = await api("/api/onboard", {method: "POST", body: fd});
-    $("#insp").innerHTML = `<h2 style="margin-top:0">Onboarding result</h2><div class="log">${esc(r.log)}</div>`;
-  } catch (e) { $("#insp").innerHTML = `<h2 style="margin-top:0">Onboarding failed</h2><div class="errs">${esc(e.message)}</div>`; }
-  try { await loadReg(); } catch (e) { $("#status").textContent = "could not refresh node list: " + e.message; }
-}
-
-
-// ---- skills
+// ============================================================ skills, crawl, wrap, onboard
 async function loadSkill(id, box) {
   try {
     const r = await api(`/api/nodes/${encodeURIComponent(id)}/skill`);
-    box.innerHTML = `<div class="row" style="margin:0 0 8px"><button class="btn sm" id="skCopy">Copy</button>
-      <a class="btn sm" id="skDl" download="SKILL.md" style="text-decoration:none">Download</a>
-      <span class="hint" style="margin:0 0 0 auto">${r.generated ? "saved in registry" : "preview, not saved yet"}</span></div>
+    box.innerHTML = `<div class="row" style="margin:0 0 8px"><button class="btn sm" id="skCopy">Copy</button><a class="btn sm" id="skDl" download="SKILL.md">Download</a><span class="hint" style="margin:0 0 0 auto">${r.generated ? "saved in registry" : "preview, not saved yet"}</span></div>
       <div class="md">${window.marked ? marked.parse(r.skill.replace(/^---[\s\S]*?---\n/, m => "```yaml\n" + m.replace(/---\n?/g, "") + "```\n")) : `<pre>${esc(r.skill)}</pre>`}</div>`;
     box.querySelector("#skCopy").onclick = e => { navigator.clipboard?.writeText(r.skill); e.target.textContent = "Copied"; };
     box.querySelector("#skDl").href = "data:text/markdown;charset=utf-8," + encodeURIComponent(r.skill);
   } catch (e) { box.innerHTML = `<div class="errs">${esc(e.message)}</div>`; }
 }
-async function busy(btn, label, fn) {
-  const old = btn.textContent; btn.disabled = true; btn.textContent = label;
-  try { return await fn(); } finally { btn.disabled = false; btn.textContent = old; }
-}
-$("#skGen").onclick = e => busy(e.target, "Generating…", async () => {
-  try { const r = await api("/api/skills/generate", {method: "POST"}); $("#skOut").innerHTML = `<span class="ok">Wrote ${r.nodes.length} node skills, the playbook and the index.</span>`; }
-  catch (x) { $("#skOut").innerHTML = `<div class="errs">${esc(x.message)}</div>`; }
-});
-$("#skCheck").onclick = e => busy(e.target, "Checking…", async () => {
-  try {
-    const r = await api("/api/skills/check");
+$("#skGen").onclick = e => busy(e.currentTarget, "Generating…", async () => {
+  try { const r = await api("/api/skills/generate", {method: "POST"}); $("#skOut").innerHTML = `<span class="ok">Wrote ${r.nodes.length} node skills, the playbook and the index.</span>`; } catch (x) { $("#skOut").innerHTML = `<div class="errs">${esc(x.message)}</div>`; } });
+$("#skCheck").onclick = e => busy(e.currentTarget, "Checking…", async () => {
+  try { const r = await api("/api/skills/check");
     const misses = Object.entries(r.by_node).flatMap(([id, v]) => v.cases.filter(c => c.verdict === "miss").map(c => ({id, ...c})));
     $("#skOut").innerHTML = `<div>Sample requests: <b>${r.hit}/${r.of}</b> led the planner to the intended node, <b>${r.alternative}</b> to another valid node that makes the same type, <b>${misses.length}</b> missed.</div>` +
       (r.alternative ? `<div class="hint">“Another valid node” means the request alone cannot tell similar nodes apart. Sharper descriptions fix that.</div>` : "") +
       misses.slice(0, 6).map(c => `<div class="dec"><b>${esc(c.id)}</b> “${esc(c.request)}” → ${esc(c.plan.slice(0, 3).join(", ") || "nothing")}</div>`).join("");
-  } catch (x) { $("#skOut").innerHTML = `<div class="errs">${esc(x.message)}</div>`; }
-});
-
-// ---- crawl / wrap
+  } catch (x) { $("#skOut").innerHTML = `<div class="errs">${esc(x.message)}</div>`; } });
 function crawlTable(r) {
-  const rows = r.units.map(u => `<tr><td><span class="badge ${u.action}">${u.action}</span></td><td><code>${esc(u.path)}${u.function ? ":" + esc(u.function) : ""}</code><div class="sub">${esc(u.why)}</div></td></tr>`).join("");
+  const rows = r.units.map(u => `<tr><td><span class="badge2 ${u.action === "skip" ? "skip" : ""}">${u.action}</span></td><td><code>${esc(u.path)}${u.function ? ":" + esc(u.function) : ""}</code><div class="sub">${esc(u.why)}</div></td></tr>`).join("");
   const res = (r.results || []).map(x => `<div class="${x.status === "verified" ? "ok" : "errs"}">${esc(x.id)}: ${esc(x.status)}${x.error ? " · " + esc(x.error) : ""}</div>`).join("");
-  return `<h2 style="margin-top:0">Crawl · ${esc(r.name)}</h2><div class="sub">${esc(r.summary || "")}</div>
-    <table class="res">${rows || `<tr><td>Nothing that looks like a tool was found.</td></tr>`}</table>
+  return `<h2>Crawl · ${esc(r.name)}</h2><div class="sub">${esc(r.summary || "")}</div><table class="res">${rows || `<tr><td>Nothing that looks like a tool was found.</td></tr>`}</table>
     ${res ? `<h2>Onboarding</h2>${res}` : `<div class="hint">Read only so far; nothing was executed. Use “Scan &amp; onboard all” to verify them by running.</div>`}`;
 }
 async function doCrawl(run, btn) {
   const src = $("#crPath").value.trim(); if (!src) return;
   const fd = new FormData(); fd.append("source", src); fd.append("run", run ? "1" : "0");
-  $("#insp").innerHTML = `<h2 style="margin-top:0">Crawling</h2><div class="log">${run ? "reading, onboarding and verifying (this runs the tools)…" : "reading the code…"}</div>`;
+  openInsp(`<h2>Crawling</h2><div class="log">${run ? "reading, onboarding and verifying (this runs the tools)…" : "reading the code…"}</div>`);
   await busy(btn, run ? "Working…" : "Reading…", async () => {
-    try {
-      const r = await api("/api/crawl", {method: "POST", body: fd});
-      $("#insp").innerHTML = crawlTable(r.report) + `<h2>Log</h2><div class="log tall">${esc(r.log)}</div>`;
-      await loadReg(); if (run) setTab("lib");
-    } catch (e) { $("#insp").innerHTML = `<h2 style="margin-top:0">Crawl failed</h2><div class="errs">${esc(e.message)}</div>`; }
-  });
+    try { const r = await api("/api/crawl", {method: "POST", body: fd}); openInsp(crawlTable(r.report) + `<h2>Log</h2><div class="log tall">${esc(r.log)}</div>`); await loadReg(); if (run) setTab("lib");
+    } catch (e) { openInsp(`<h2>Crawl failed</h2><div class="errs">${esc(e.message)}</div>`); } });
 }
-$("#crScan").onclick = e => doCrawl(false, e.target);
-$("#crRun").onclick = e => doCrawl(true, e.target);
-
-$("#wrFind").onclick = e => busy(e.target, "Reading…", async () => {
-  try {
-    const fns = await api("/api/wrap/discover?path=" + encodeURIComponent($("#wrPath").value.trim()));
-    $("#wrList").innerHTML = fns.length ? fns.map(f => `<div class="fnrow"><div><b>${esc(f.function)}</b><div class="m">${esc(f.problems.length ? f.problems[0] : (f.doc.split("\n")[0] || f.params.map(p => p.name).join(", ")))}</div></div>
-      ${f.problems.length ? "" : `<button class="btn sm go" data-wrap="${esc(f.function)}">Wrap</button>`}</div>`).join("") : `<div class="hint">No public functions found.</div>`;
-  } catch (x) { $("#wrList").innerHTML = `<div class="errs">${esc(x.message)}</div>`; }
-});
+$("#crScan").onclick = e => doCrawl(false, e.currentTarget); $("#crRun").onclick = e => doCrawl(true, e.currentTarget);
+$("#wrFind").onclick = e => busy(e.currentTarget, "Reading…", async () => {
+  try { const fns = await api("/api/wrap/discover?path=" + encodeURIComponent($("#wrPath").value.trim()));
+    $("#wrList").innerHTML = fns.length ? fns.map(f => `<div class="fnrow"><div><b>${esc(f.function)}</b><div class="m">${esc(f.problems.length ? f.problems[0] : (f.doc.split("\n")[0] || f.params.map(p => p.name).join(", ")))}</div></div>${f.problems.length ? "" : `<button class="btn sm go" data-wrap="${esc(f.function)}">Wrap</button>`}</div>`).join("") : `<div class="hint">No public functions found.</div>`;
+  } catch (x) { $("#wrList").innerHTML = `<div class="errs">${esc(x.message)}</div>`; } });
 $("#wrList").onclick = async ev => {
-  const b = ev.target.closest("[data-wrap]"); if (!b) return;
-  const fd = new FormData(); fd.append("path", $("#wrPath").value.trim()); fd.append("function", b.dataset.wrap);
-  await busy(b, "Wrapping…", async () => {
-    try {
-      const r = await api("/api/wrap", {method: "POST", body: fd});
-      $("#insp").innerHTML = `<h2 style="margin-top:0">Wrapped · ${esc(r.node)}</h2><div class="${r.status === "verified" ? "ok" : "errs"}">${esc(r.status)}</div><div class="log tall">${esc(r.log)}</div>`;
-      await loadReg();
-    } catch (x) { $("#insp").innerHTML = `<h2 style="margin-top:0">Wrap failed</h2><div class="errs">${esc(x.message)}</div>`; }
-  });
+  const b = ev.target.closest("[data-wrap]"); if (!b) return; const fd = new FormData(); fd.append("path", $("#wrPath").value.trim()); fd.append("function", b.dataset.wrap);
+  await busy(b, "Wrapping…", async () => { try { const r = await api("/api/wrap", {method: "POST", body: fd});
+    openInsp(`<h2>Wrapped · ${esc(r.node)}</h2><div class="${r.status === "verified" ? "ok" : "errs"}">${esc(r.status)}</div><div class="log tall">${esc(r.log)}</div>`); await loadReg();
+  } catch (x) { openInsp(`<h2>Wrap failed</h2><div class="errs">${esc(x.message)}</div>`); } });
 };
+$("#obBtn").onclick = e => busy(e.currentTarget, "Analyzing…", async () => {
+  const fd = new FormData(); fd.append("path", $("#obPath").value); if ($("#obZip").files[0]) fd.append("archive", $("#obZip").files[0]);
+  openInsp(`<h2>Onboarding</h2><div class="log">analyzing, building, running on samples…</div>`);
+  try { const r = await api("/api/onboard", {method: "POST", body: fd}); openInsp(`<h2>Onboarding result</h2><div class="log tall">${esc(r.log)}</div>`);
+  } catch (x) { openInsp(`<h2>Onboarding failed</h2><div class="errs">${esc(x.message)}</div>`); }
+  try { await loadReg(); } catch (x) { toast("Could not refresh the node list: " + x.message, "bad"); } });
 
-// ---- AI settings
+// ---- tool sources (auto-fetch converters when no registered node fits)
+let SRC = [];
+function drawSrc() { $("#srcList").innerHTML = SRC.map((s, i) => `<div class="srow"><span title="${esc(s)}">${esc(s)}</span><button data-rm="${i}" title="Remove">✕</button></div>`).join(""); }
+async function loadSrc() { try { SRC = (await api("/api/sources")).sources; drawSrc(); } catch (e) { /* optional */ } }
+const saveSrc = () => api("/api/sources", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({sources: SRC})});
+$("#srcAdd").onclick = async () => { const v = $("#srcIn").value.trim(); if (!v) return; SRC.push(v); $("#srcIn").value = ""; drawSrc(); await saveSrc(); toast("Source added. Use Sync now, or just ask for a pipeline: it is searched automatically.", "ok"); };
+$("#srcList").onclick = async ev => { const b = ev.target.closest("[data-rm]"); if (!b) return; SRC.splice(+b.dataset.rm, 1); drawSrc(); await saveSrc(); };
+$("#srcSync").onclick = e => busy(e.currentTarget, "Syncing…", async () => {
+  try { const r = await api("/api/sources/sync", {method: "POST"}); const n = r.synced.reduce((a, s) => a + (s.new || []).length, 0);
+    $("#srcOut").innerHTML = r.synced.map(s => s.error ? `<div class="errs">${esc(s.source)}: ${esc(s.error)}</div>` : `<div class="ok">${esc(s.source)}: ${(s.new || []).length} new node(s)</div>`).join("") || "No sources yet.";
+    await loadReg(); if (n) toast(n + " node(s) added from your sources", "ok");
+  } catch (x) { $("#srcOut").innerHTML = `<div class="errs">${esc(x.message)}</div>`; } });
+
+// ============================================================ AI settings
 async function loadSettings() {
-  try {
-    const s = await api("/api/settings");
-    $("#sProv").value = s.llm.provider || "none"; $("#sModel").value = s.llm.model || ""; $("#sBase").value = s.llm.base_url || "";
-    $("#sKey").value = s.llm.api_key || ""; $("#sDec").value = s.decider || "auto";
-    $("#sLaya").value = (s.laya || {}).model || ""; $("#sConf").value = (s.laya || {}).min_confidence || "";
-  } catch (e) { /* settings are optional */ }
+  try { const s = await api("/api/settings");
+    $("#sProv").value = s.llm.provider || "none"; $("#sModel").value = s.llm.model || ""; $("#sBase").value = s.llm.base_url || ""; $("#sKey").value = s.llm.api_key || "";
+    $("#sDec").value = s.decider || "auto"; $("#sLaya").value = (s.laya || {}).model || ""; $("#sConf").value = (s.laya || {}).min_confidence || ""; } catch (e) { /* optional */ }
 }
+async function fetchModels() {
+  const q = new URLSearchParams({base_url: $("#sBase").value.trim(), api_key: $("#sKey").value.trim()}); $("#sModels").innerHTML = `<span class="hint">asking the server…</span>`;
+  try { const r = await api("/api/models?" + q);
+    if (!$("#sBase").value.trim() || r.server === "ollama") $("#sBase").value = r.base_url; if (r.server === "ollama" || $("#sProv").value === "none") $("#sProv").value = "openai";
+    $("#modelList").innerHTML = r.models.map(m => `<option value="${esc(m.name)}">`).join("");
+    $("#sModels").innerHTML = r.models.length ? r.models.map(m => `<button class="chip ${m.name === $("#sModel").value ? "on" : ""}" data-m="${esc(m.name)}">${esc(m.name)}${m.size ? " · " + (m.size / 1e9).toFixed(1) + " GB" : ""}</button>`).join("") : `<span class="hint">${esc(r.server)} is running but has no models. For Ollama: <code>ollama pull llama3.1</code></span>`;
+  } catch (e) { $("#sModels").innerHTML = `<div class="errs">${esc(e.message)}</div>`; }
+}
+$("#sFetch").onclick = fetchModels;
+$("#sOllama").onclick = () => { $("#sProv").value = "openai"; $("#sBase").value = "http://localhost:11434/v1"; $("#sKey").value = ""; fetchModels(); };
+$("#sModels").onclick = ev => { const c = ev.target.closest("[data-m]"); if (!c) return; $("#sModel").value = c.dataset.m; document.querySelectorAll("#sModels .chip").forEach(x => x.classList.toggle("on", x === c)); };
+$("#gear").onclick = () => $("#setDlg").showModal(); $("#llmChip").onclick = () => $("#setDlg").showModal(); $("#sClose").onclick = () => $("#setDlg").close();
 $("#sSave").onclick = async () => {
   $("#sOut").textContent = "saving and testing…";
-  const body = {llm: {provider: $("#sProv").value === "none" ? "none" : $("#sProv").value, model: $("#sModel").value.trim(),
-                      base_url: $("#sBase").value.trim(), api_key: $("#sKey").value.trim()},
-                decider: $("#sDec").value, laya: {model: $("#sLaya").value.trim(), min_confidence: parseFloat($("#sConf").value) || 0.5}};
-  try {
-    await api("/api/settings", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify(body)});
-    const t = await api("/api/settings/test", {method: "POST"});
-    const l = t.llm, d = t.decision_test || {};
-    $("#sOut").innerHTML = (l.ok ? `<div class="ok">LLM OK: ${esc(l.provider)} · ${esc(l.model)} replied “${esc(l.reply)}”</div>`
-                                 : `<div class="errs">LLM: ${esc(l.error)}</div>`) +
+  const body = {llm: {provider: $("#sProv").value, model: $("#sModel").value.trim(), base_url: $("#sBase").value.trim(), api_key: $("#sKey").value.trim()}, decider: $("#sDec").value, laya: {model: $("#sLaya").value.trim(), min_confidence: parseFloat($("#sConf").value) || 0.5}};
+  try { await api("/api/settings", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify(body)});
+    const t = await api("/api/settings/test", {method: "POST"}), l = t.llm, d = t.decision_test || {};
+    $("#sOut").innerHTML = (l.ok ? `<div class="ok">LLM OK: ${esc(l.provider)} · ${esc(l.model)} replied “${esc(l.reply)}”</div>` : `<div class="errs">LLM: ${esc(l.error)}</div>`) +
       `<div>Decision engine order: ${esc((t.decider.order || []).join(" → "))}${t.decider.laya_installed ? "" : " (Laya not installed: <code>pip install laya</code>)"}</div>` +
       (d.error ? `<div class="errs">decision test: ${esc(d.error)}</div>` : `<div>decision test → ${esc(d.choice)} by ${esc(d.backend)}${(d.errors || []).length ? " (fell back: " + esc(d.errors.join("; ")) + ")" : ""}</div>`);
-    await loadSettings(); await loadReg();
+    await loadSettings(); await loadReg(); loadModels().then(() => render());
   } catch (e) { $("#sOut").innerHTML = `<div class="errs">${esc(e.message)}</div>`; }
 };
 
-window.addEventListener("resize", drawEdges);
-document.addEventListener("keydown", e => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && Q.tab === "build") $("#planBtn").click(); });
+// ============================================================ boot
+function banner(msg) { let b = $("#errBanner"); if (!b) { b = document.createElement("div"); b.id = "errBanner"; b.style.cssText = "position:fixed;bottom:44px;left:50%;transform:translateX(-50%);background:#3b1e22;border:1px solid var(--bad);padding:8px 14px;border-radius:9px;z-index:99;max-width:80vw;font-size:12px"; document.body.appendChild(b); } b.textContent = "UI error: " + msg; }
 window.addEventListener("error", e => banner(e.message));
 window.addEventListener("unhandledrejection", e => banner(e.reason && e.reason.message || String(e.reason)));
-function banner(msg) {
-  let b = $("#errBanner");
-  if (!b) { b = document.createElement("div"); b.id = "errBanner"; b.style.cssText = "position:fixed;bottom:12px;left:50%;transform:translateX(-50%);background:#3b1e22;border:1px solid var(--bad);color:var(--text);padding:8px 14px;border-radius:9px;z-index:99;max-width:80vw;font-size:12px"; document.body.appendChild(b); }
-  b.textContent = "UI error: " + msg;
-}
-loadReg().catch(() => {}); loadSettings();
+window.addEventListener("resize", () => { drawEdges(); });
+try { if (localStorage.getItem("constellation.panel") === "0") togglePanel(true); } catch (e) { /* ignore */ }
+restoreDraft(); render(); statusBar();
+loadReg().then(() => { if (S.nodes.length) fit(); }).catch(() => {}); loadSettings(); loadSrc(); loadModels().then(() => render());
 </script>
 </body>
 </html>

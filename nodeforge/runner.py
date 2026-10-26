@@ -98,9 +98,39 @@ def _values(m: Manifest, inputs: dict, params: dict, outdir: str, path_map=_slas
     return vals
 
 
+def heal(m: Manifest) -> str | None:
+    """A registry copied from another machine has absolute paths that do not exist here.
+    Rebuild the pinned app folder from a local source if possible; return an error text if not."""
+    ad = app_dir(m)
+    if os.path.isdir(ad):
+        return None
+    root = os.path.dirname(REGISTRY_DIR)
+    base = os.path.basename(m.tool_dir.replace("\\", "/").rstrip("/"))
+    for cand in (m.tool_dir, os.path.join(root, "wrapped", m.id), os.path.join(root, "wrapped", base),
+                 os.path.join(root, "sample_tools", base), os.path.join(root, "builtin_nodes", m.id)):
+        if cand and os.path.isdir(cand):
+            r = prepare(m, cand)
+            return None if r["ok"] else "setup failed:\n" + r["log"][-600:]
+    return (f"node '{m.id}' is not installed on this machine (its files from {m.tool_dir} are missing). "
+            "Add it again under Add tools, e.g. wrap the function or onboard the folder here.")
+
+
+def _fix_python(cmd: str) -> str:
+    """'/usr/bin/python x.py' recorded on Linux: use this machine's interpreter."""
+    import sys
+    first, _, rest = cmd.partition(" ")
+    if re.match(r"^(/|[A-Za-z]:[\\/]).*python[\d.]*(\.exe)?$", first, re.I) and not os.path.exists(first):
+        return f'"{sys.executable}" {rest}' if " " in sys.executable else f"{sys.executable} {rest}"
+    return cmd
+
+
 def run_node(m: Manifest, inputs: dict, params: dict, outdir: str, backend: str = "local",
              cwd: str | None = None, remote_url: str | None = None) -> dict:
     os.makedirs(outdir, exist_ok=True)
+    if backend != "remote" and not cwd:
+        err = heal(m)
+        if err:
+            return {"ok": False, "outputs": {}, "log": err, "errors": [err]}
     try:
         if backend == "remote":
             return _run_remote(m, inputs, params, outdir, remote_url)
@@ -110,7 +140,7 @@ def run_node(m: Manifest, inputs: dict, params: dict, outdir: str, backend: str 
             res = _run_docker(m, inputs, params, outdir)
         else:
             vals = _values(m, inputs, params, outdir)
-            cmd = render(m.runtime.command, vals)
+            cmd = _fix_python(render(m.runtime.command, vals))
             r = sandbox.run(cmd, cwd or app_dir(m), timeout=m.runtime.timeout_s, env=m.runtime.env)
             res = {"cmd": cmd, "code": r["code"], "log": r["output"], "timeout": r["timeout"]}
     except (ValueError, KeyError) as e:
@@ -122,8 +152,18 @@ def _collect(m: Manifest, outdir: str, res: dict) -> dict:
     outputs, errors, observed = {}, [], {}
     if res.get("code", 0) != 0:
         errors.append(f"exit code {res.get('code')}" + (" (timeout)" if res.get("timeout") else ""))
+    claimed = set()
     for o in m.outputs:
         p = output_path(o, outdir)
+        if not os.path.exists(p) and (o.description or "").startswith("discovered output"):
+            # the tool names its file after its input (drawing.cgm -> drawing.svg): take the new file of that type
+            ext = os.path.splitext(p)[1].lower()
+            found = [os.path.join(c, f) for c, _, fs in os.walk(outdir) for f in fs if f.lower().endswith(ext)]
+            found = [f for f in found if os.path.normpath(f) not in claimed and
+                     os.path.normpath(f) not in {os.path.normpath(output_path(x, outdir)) for x in m.outputs}]
+            if found:
+                p = max(found, key=os.path.getmtime)
+        claimed.add(os.path.normpath(p))
         if not os.path.exists(p) or (os.path.isfile(p) and os.path.getsize(p) == 0):
             if o.required:
                 errors.append(f"output '{o.name}' not produced at {p}")

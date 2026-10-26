@@ -15,6 +15,7 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 
 import threading
+from nodeforge.manifest import REGISTRY_DIR
 
 from nodeforge import executor, graph, llm, runner, settings
 from nodeforge.manifest import Manifest, load_all, load_md, save
@@ -23,6 +24,12 @@ from nodeforge.sandbox import WORK_ROOT
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 app = FastAPI(title="NodeForge")
+
+
+@app.on_event("startup")
+def _builtin_nodes():
+    from nodeforge import builtin
+    threading.Thread(target=builtin.ensure, kwargs={"log": lambda m: None}, daemon=True).start()
 ONBOARD_LOCK = threading.Lock()   # two onboardings at once would share registry folders
 
 
@@ -37,7 +44,9 @@ def vendor(name: str):
     p = os.path.join(ROOT, "ui", "vendor", os.path.basename(name))
     if not os.path.isfile(p):
         raise HTTPException(404)
-    return FileResponse(p, media_type="text/javascript")
+    import mimetypes
+    mt = "font/woff2" if p.endswith(".woff2") else (mimetypes.guess_type(p)[0] or "application/octet-stream")
+    return FileResponse(p, media_type=mt, headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.get("/api/models")
@@ -68,6 +77,15 @@ def api_models(base_url: str = "", api_key: str = ""):
     except Exception as e:  # noqa
         errs.append(f"/models: {e}")
     raise HTTPException(502, "could not list models. Is the server running? " + " | ".join(errs))
+
+
+VERSION = "0.4.0"
+
+
+@app.get("/api/health")
+def health():
+    """For Docker/Kubernetes health checks and the launcher's 'is it up yet' loop."""
+    return {"ok": True, "version": VERSION, "nodes": len(load_all())}
 
 
 @app.get("/api/status")
@@ -105,7 +123,12 @@ def test_settings():
 
 @app.get("/api/nodes")
 def nodes():
-    return [{**m.model_dump(), "md": load_md(m.id)} for m in load_all().values()]
+    out = []
+    for m in load_all().values():
+        sk = os.path.join(REGISTRY_DIR, m.id, "SKILL.md")
+        skill = open(sk, encoding="utf-8", errors="replace").read()[:6000] if os.path.exists(sk) else ""
+        out.append({**m.model_dump(), "md": load_md(m.id), "skill": skill})
+    return out
 
 
 @app.post("/api/onboard")
@@ -167,6 +190,39 @@ async def api_crawl(source: str = Form(...), run: str = Form("0")):
             raise HTTPException(400, str(e))
     rep = await _exclusive(job)
     return {"log": "\n".join(logs), "report": rep}
+
+
+@app.get("/api/sources")
+def api_sources():
+    return {"sources": settings.load().get("sources", [])}
+
+
+@app.post("/api/sources")
+async def api_sources_set(req: Request):
+    body = await req.json()
+    src = [s.strip() for s in body.get("sources", []) if str(s).strip()]
+    settings.save({"sources": src})
+    return {"sources": src}
+
+
+def _sync_sources(logs):
+    from nodeforge import crawl
+    done = []
+    for src in settings.load().get("sources", []):
+        try:
+            rep = crawl.crawl(src, onboard_units=True, log=logs.append, skip_existing=True)
+            done.append({"source": src, "new": [r["id"] for r in rep["results"]]})
+        except Exception as e:  # noqa
+            logs.append(f"{src}: {e}")
+            done.append({"source": src, "error": str(e)})
+    return done
+
+
+@app.post("/api/sources/sync")
+async def api_sources_sync():
+    logs = []
+    done = await _exclusive(lambda: _sync_sources(logs))
+    return {"log": "\n".join(logs), "synced": done}
 
 
 @app.get("/api/wrap/discover")
@@ -255,7 +311,15 @@ async def api_plan(req: Request):
     body = await req.json()
     import anyio
     g = await anyio.to_thread.run_sync(lambda: graph.plan(body.get("request", ""), body.get("uploads")))
-    return {"graph": g, "errors": graph.validate(g)}
+    synced = None
+    if g.get("planner") == "ai-only fallback" and settings.load().get("sources"):
+        logs = []   # nothing registered fits: look in the user's tool sources, onboard what is there, plan again
+        synced = await _exclusive(lambda: _sync_sources(logs))
+        g2 = await anyio.to_thread.run_sync(lambda: graph.plan(body.get("request", ""), body.get("uploads")))
+        if g2.get("planner") != "ai-only fallback":
+            g = g2
+            g["note"] = "Found the tool in your tool sources and added it. " + (g.get("note") or "")
+    return {"graph": g, "errors": graph.validate(g), "synced": synced}
 
 
 @app.post("/api/validate")

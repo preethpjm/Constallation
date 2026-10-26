@@ -16,6 +16,7 @@ class Port(BaseModel):
     description: str = ""
     required: bool = True
     default: Optional[str] = None     # for params
+    widget: str = ""                  # params: UI control hint: color | number | bool | range:0-1 | select:a|b|c | text | area
     # outputs only: where the file appears. Placeholders allowed, e.g. "{outdir}/model.glb"
     path: Optional[str] = None
 

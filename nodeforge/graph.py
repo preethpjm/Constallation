@@ -11,7 +11,7 @@ import os
 import re
 
 from . import decider, llm, settings
-from .manifest import Manifest, load_all, load_md
+from .manifest import REGISTRY_DIR, Manifest, load_all, load_md
 from .types import WORD_MIME, compatible, mime_from_name
 
 AI_NODE = Manifest(id="ai", name="AI step", description="LLM transform: reads text inputs, follows a prompt, "
@@ -137,8 +137,21 @@ OUTPUT_WORDS = {"listing": "text/html", "page": "text/html", "website": "text/ht
                 "pricing": "text/csv", "price": "text/csv", "json": "application/json"}
 
 
+def _stem(t):
+    return t[:-1] if len(t) > 3 and t.endswith("s") and not t.endswith(("ss", "us", "is")) else t
+
+
 def _tok(s):
-    return [t for t in re.split(r"[^a-z0-9]+", (s or "").lower()) if t]
+    return [_stem(t) for t in re.split(r"[^a-z0-9]+", (s or "").lower()) if t]
+
+
+def _near(words, text):
+    """Words that appear in the text, allowing a word to be the start of a longer one (cgm ~ cgmconverter)."""
+    hit = set()
+    for w in words:
+        if w in text or (len(w) >= 3 and any(t.startswith(w) or (len(t) >= 4 and w.startswith(t)) for t in text)):
+            hit.add(w)
+    return hit
 
 
 def _expand(words):
@@ -149,8 +162,8 @@ def _expand(words):
 
 
 def relevance(m: Manifest, words: set) -> float:
-    text = set(_tok(m.id) + m.tags + _tok(m.description))
-    return len(words & text) + 0.5 * len(words & set(_tok(load_md(m.id))))
+    text = set(_tok(m.id) + [_stem(t) for t in m.tags] + _tok(m.description))
+    return len(_near(words, text)) + 0.5 * len(words & set(_tok(load_md(m.id))))
 
 
 STOP = {"the", "a", "an", "and", "or", "of", "for", "in", "on", "to", "from", "with", "by", "is", "it", "this", "that",
@@ -159,10 +172,48 @@ STOP = {"the", "a", "an", "and", "or", "of", "for", "in", "on", "to", "from", "w
 
 def _strong(m: Manifest, words: set) -> int:
     """Overlap between the request's meaningful words and what the node says about itself (id, tags, description)."""
-    return len((words - STOP) & set(_tok(m.id) + m.tags + _tok(m.description)))
+    return len(_near(words - STOP, set(_tok(m.id) + [_stem(t) for t in m.tags] + _tok(m.description))))
+
+
+CUE_VOCAB = {"convert", "make", "create", "generate", "produce", "pipeline", "workflow", "please", "image", "picture", "drawing",
+             "markdown", "report", "listing", "preview", "upper", "lower", "case", "price", "pricing", "supplier", "email", "slug",
+             "dedupe", "duplicate", "compare", "extract", "summary", "table", "spreadsheet", "document", "translate", "resize"}
+
+
+def _correct(request: str, reg: dict) -> str:
+    """Fix typos and split/joined words against what the registry and the type words actually contain:
+    'pipline ... liek ...' and 'testrep oshout' still find their tool."""
+    import difflib
+    vocab, ids = set(CUE_VOCAB) | set(OUTPUT_WORDS) | set(WORD_MIME) | set(SYN) | {"like", "from", "into", "that"}, {}
+    for m in reg.values():
+        vocab.update(_tok(m.id) + [_stem(t) for t in m.tags] + _tok(m.description))
+        ids[re.sub(r"[^a-z0-9]", "", m.id.lower())] = m.id
+    raw = re.findall(r"[A-Za-z0-9]+|[^A-Za-z0-9]+", request)
+    words = [t for t in raw if t[0].isalnum()]
+    out, i = [], 0
+    while i < len(words):
+        w = words[i].lower()
+        if i + 1 < len(words):   # "testrep oshout" -> testrepo-shout
+            j = w + words[i + 1].lower()
+            hit = difflib.get_close_matches(j, list(ids), n=1, cutoff=0.86)
+            if hit and w not in vocab:
+                out.append(ids[hit[0]].replace("-", " ")); i += 2; continue
+        if len(w) >= 4 and _stem(w) not in vocab and w not in vocab and not any(c.isdigit() for c in w):
+            hit = [h for h in difflib.get_close_matches(_stem(w), list(vocab) + list(ids), n=3, cutoff=0.84)
+                   if h[0] == w[0] and abs(len(h) - len(w)) <= 1][:1] or \
+                [v for v in vocab if len(v) == len(w) and v[0] == w[0] and sorted(v) == sorted(w)][:1]
+            if hit:
+                out.append(ids.get(hit[0], hit[0]).replace("-", " ")); i += 1; continue
+        elif len(w) >= 6 and any(c.isdigit() for c in w):   # stepp2glb
+            hit = difflib.get_close_matches(w, list(ids), n=1, cutoff=0.8)
+            if hit:
+                out.append(ids[hit[0]].replace("-", " ")); i += 1; continue
+        out.append(words[i]); i += 1
+    return " ".join(out)
 
 
 def plan_heuristic(request: str, reg: dict[str, Manifest], uploads: list[str] | None = None) -> dict:
+    request = _correct(request, {k: v for k, v in reg.items() if v.verification.status == "verified"})
     words = _expand(_tok(request))
     all_reg = reg
     reg = {k: v for k, v in reg.items() if v.verification.status == "verified"}
@@ -185,14 +236,36 @@ def plan_heuristic(request: str, reg: dict[str, Manifest], uploads: list[str] | 
     # "convert X to Y", "make a Y from the X": the type named as the result wins over words that describe inputs
     m_t = re.search(r"\b(?:to|into|as)\s+(?:an?\s+|the\s+)?([a-z0-9]+)|\b(?:make|create|generate|produce|need|get)\s+(?:me\s+)?(?:an?\s+|the\s+)?([a-z0-9]+)", request.lower())
     if m_t:
-        w = m_t.group(1) or m_t.group(2)
+        w = _stem(m_t.group(1) or m_t.group(2))
         mm = OUTPUT_WORDS.get(w) or WORD_MIME.get(w) or {"text": "text/plain", "txt": "text/plain", "markdown": "text/markdown"}.get(w)
         if mm and any(o.mime == mm for m in reg.values() for o in m.outputs):
+            targets = [(mm, w)]
+    if True:   # "convert cgms to images like svg": a type word some node can make, after the cue word if any
+        toks = _tok(request)
+        cues = [i for i, w in enumerate(toks) if w in ("to", "into", "as", "like", "make", "create", "generate")]
+        cue = -1
+        FAMILY = {"image": "image/", "picture": "image/", "drawing": "image/", "graphic": "image/", "vector": "image/",
+                  "illustration": "image/", "photo": "image/"}
+        def producer_mime(w):   # exact type first; then any type of the family a node can make ("pictures" -> svg)
+            mm = OUTPUT_WORDS.get(w) or WORD_MIME.get(w) or {"text": "text/plain", "txt": "text/plain", "markdown": "text/markdown"}.get(w)
+            outs = [o.mime for m in reg.values() for o in m.outputs]
+            if mm in outs:
+                return mm
+            return next((x for x in outs if w in FAMILY and x.startswith(FAMILY[w])), None)
+        cands = [(i, w, producer_mime(w)) for i, w in enumerate(toks)]
+        cands = [(i, w, mm) for i, w, mm in cands if mm]
+        direct = [c for c in cands if any(0 < c[0] - q <= 2 for q in cues)]   # the type word right after "to"/"like"/"make"
+        if direct or (cands and not targets):
+            _, w, mm = direct[-1] if direct else cands[-1]
             targets = [(mm, w)]
     if not targets:  # fall back: the most relevant node's outputs
         best = max(reg.values(), key=lambda m: relevance(m, words), default=None)
         # a weak match is not a plan: better an honest "nothing fits" than a random chain of tools
-        targets = [(best.outputs[0].mime, "")] if best and best.outputs and (_strong(best, words) >= 2 or best.id.lower() in request.lower()) else []
+        meaningful = {w for w in words - STOP if len(w) >= 4}
+        ranked = sorted(reg.values(), key=lambda m: -_strong(m, meaningful))
+        top = _strong(ranked[0], meaningful) if ranked else 0
+        clear = top >= 1 and (len(ranked) < 2 or top - _strong(ranked[1], meaningful) >= 1)
+        targets = [(best.outputs[0].mime, "")] if best and best.outputs and (_strong(best, words) >= 2 or best.id.lower() in request.lower() or clear) else []
     nodes, edges, producing = [], [], {}   # producing[mime] = [(node_id, port)]
     decisions = []
 
@@ -229,6 +302,8 @@ def plan_heuristic(request: str, reg: dict[str, Manifest], uploads: list[str] | 
         nodes.append({"id": i, "kind": "input", "mime": mime, "label": label})
         return i
 
+    cur_target = [None]
+
     def satisfy(mime, port_name, consumer_tool, depth, chain):
         # 1) reuse something already in the graph
         for (src, sp) in producing.get(mime, []):
@@ -243,6 +318,11 @@ def plan_heuristic(request: str, reg: dict[str, Manifest], uploads: list[str] | 
         # 2b) a generic port ("in_csv", "input") and the user named that type or uploaded such a file
         if not pw and mime in said_mimes:
             return add_upload(mime, port_name), "file"
+        # 2c) a generic port and the user named exactly one type it can take: that is the upload
+        if not pw and mime != "model/step":
+            have = {x for x in said_mimes if x != cur_target[0] and x != "text/plain" and compatible(x, mime)}
+            if len(have) == 1:
+                return add_upload(next(iter(have)), port_name), "file"
         # 3) a relevant tool can make it
         if depth < 6:
             cands = []
@@ -287,6 +367,7 @@ def plan_heuristic(request: str, reg: dict[str, Manifest], uploads: list[str] | 
         return 6.0 * sum(x in have for x in need) / len(need) if need else 0.0
 
     for t, word in targets:
+        cur_target[0] = t
         ask = _expand([word]) if word else set()
         prods = [(relevance(m, words) + 5 * relevance(m, ask) + fit_inputs(m, t), m, o)
                  for m in reg.values() for o in m.outputs if o.mime == t]
@@ -319,6 +400,10 @@ Node kinds:
 Edges: {"src":"t1","src_port":"<output port>","dst":"t2","dst_port":"<input port>"}; input nodes expose port "file".
 Types on both ends of an edge must match. Connect every required input. Use only tools listed.
 Prefer reusing one tool's output for several consumers over duplicating tools.
+TOOLS FIRST: every step a listed tool can do must use that tool, matched by its description, tags, ports and
+"when_to_use" phrases (plural/typo/loose wording in the request still counts: "cgms to images like svg" means the
+cgm -> svg tool). An "ai" node is only a helper for a step no tool can do (summarising, rewriting, judging text);
+never replace a tool step with an ai node, and never return a plan made only of ai nodes when a tool fits.
 Never return an empty plan. If no listed tool can do a step, use an "ai" node for that step (give it a precise prompt)
 and add a top-level "note" string saying which kind of tool is missing from the registry. Every plan ends in an output node."""
 
@@ -328,7 +413,13 @@ def registry_brief(reg):
     for m in reg.values():
         if m.verification.status != "verified":
             continue
-        lines.append(json.dumps({"id": m.id, "description": m.description,
+        when = []
+        sk = os.path.join(REGISTRY_DIR, m.id, "SKILL.md")
+        if os.path.exists(sk):
+            txt = open(sk, encoding="utf-8", errors="replace").read()
+            sec = re.search(r"## When to use(.*?)(?:\n## |\Z)", txt, re.S)
+            when = re.findall(r'^\s*[-*]\s*"([^"]+)"', sec.group(1), re.M)[:4] if sec else []
+        lines.append(json.dumps({"id": m.id, "description": m.description, "tags": m.tags[:10], "when_to_use": when,
                                  "inputs": [{"port": p.name, "kind": p.kind, "type": p.mime, "required": p.required}
                                             for p in m.inputs],
                                  "outputs": [{"port": o.name, "type": o.mime} for o in m.outputs]}))
@@ -384,6 +475,11 @@ def _plan(request: str, uploads: list[str] | None = None) -> dict:
                 errs = validate(g, reg) or _usable(g)
                 if not errs:
                     g["planner"] = f"llm:{llm.model_name()}"
+                    if not any(n.get("kind") == "tool" for n in g["nodes"]):   # tools first: AI-only plan while a tool fits
+                        h = plan_heuristic(request, reg, uploads)
+                        if any(n.get("kind") == "tool" for n in h["nodes"]) and not validate(h, reg):
+                            h["note"] = f"The LLM proposed only AI steps; {llm.model_name()} was overruled because registered tools fit."
+                            return h
                     return g
                 msg += f"\n\nYOUR PLAN:\n{json.dumps(g)}\nVALIDATION ERRORS (fix them):\n" + "\n".join(errs)
                 last = errs

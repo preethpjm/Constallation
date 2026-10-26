@@ -39,7 +39,8 @@ def main():
     p = sub.add_parser("plan"); p.add_argument("request")
     r = sub.add_parser("run"); r.add_argument("request"); r.add_argument("files", nargs="+")
     r.add_argument("-p", "--param", action="append", default=[], help="name=value, applied to any node with that param")
-    s = sub.add_parser("serve"); s.add_argument("--port", type=int, default=8800); s.add_argument("--host", default="127.0.0.1")
+    s = sub.add_parser("serve"); s.add_argument("--port", type=int, default=int(os.environ.get("CONSTELLATION_PORT", 8800)))
+    s.add_argument("--host", default=os.environ.get("CONSTELLATION_HOST", "127.0.0.1")); s.add_argument("--open", action="store_true", help="open the browser when ready")
     a = ap.parse_args()
 
     if a.cmd == "onboard":
@@ -113,9 +114,21 @@ def main():
             if n["kind"] == "output" and res["nodes"][n["id"]]["ok"]:
                 print(f"  {n['label']}: {res['nodes'][n['id']]['outputs']['file']}")
     elif a.cmd == "serve":
+        import threading
         import uvicorn
         from server import app
-        uvicorn.run(app, host=a.host, port=a.port)
+        if a.open:  # wait until /api/health answers, then open the browser (works for 0.0.0.0 too)
+            def _open():
+                import time, urllib.request, webbrowser
+                url = f"http://{'localhost' if a.host in ('0.0.0.0', '::') else a.host}:{a.port}"
+                for _ in range(60):
+                    try:
+                        urllib.request.urlopen(url + "/api/health", timeout=1); webbrowser.open(url); return
+                    except Exception:  # noqa
+                        time.sleep(0.5)
+            threading.Thread(target=_open, daemon=True).start()
+        print(f"Constellation on http://{a.host}:{a.port}   (Ctrl+C to stop)")
+        uvicorn.run(app, host=a.host, port=a.port, log_level="warning")
 
 
 if __name__ == "__main__":

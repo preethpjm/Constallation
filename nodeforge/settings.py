@@ -12,10 +12,10 @@ import json
 import os
 import threading
 
-PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "nodeforge.settings.json")
+PATH = os.environ.get("NODEFORGE_SETTINGS") or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "nodeforge.settings.json")
 _lock = threading.Lock()
 DEFAULTS = {"llm": {"provider": "", "model": "", "base_url": "", "api_key": ""},
-            "decider": "auto", "laya": {"model": "", "min_confidence": 0.0}}
+            "decider": "auto", "sources": [], "laya": {"model": "", "min_confidence": 0.0}}
 
 
 def load() -> dict:

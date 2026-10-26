@@ -73,14 +73,15 @@ def tool_loop(system: str, user: str, tools: list[dict], handlers: dict, max_tur
     raise RuntimeError("no LLM configured")
 
 
-def complete(system: str, user: str, max_tokens: int = 1500) -> str:
+def complete(system: str, user: str, max_tokens: int = 1500, model: str | None = None) -> str:
     p = provider()
+    mdl = model or model_name()
     if p == "anthropic":
-        r = _anthropic().messages.create(model=model_name(), max_tokens=max_tokens, system=system,
+        r = _anthropic().messages.create(model=mdl, max_tokens=max_tokens, system=system,
                                                   messages=[{"role": "user", "content": user}])
         return "".join(b.text for b in r.content if b.type == "text")
     if p == "openai":
-        r = _openai().chat.completions.create(model=model_name(), max_tokens=max_tokens, messages=[
+        r = _openai().chat.completions.create(model=mdl, max_tokens=max_tokens, messages=[
             {"role": "system", "content": system}, {"role": "user", "content": user}])
         return r.choices[0].message.content or ""
     raise RuntimeError("no LLM configured")
